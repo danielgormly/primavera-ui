@@ -1,0 +1,5 @@
+{
+  "name": "primavera-ui",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"]
+}

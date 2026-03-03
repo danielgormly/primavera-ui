@@ -1,0 +1,71 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Introduction">
+  <h1>primavera-ui</h1>
+  <p>Primavera is a spec-first component library with plain JS web component implementations. Spec is handwritten, opinionated, and relatively informal — markdown files. Implementations are vibe-coded based on spec then tested & further refined.</p>
+  <p>I am building this because I have a need for framework-free components and I believe detailed specification for human user interfaces is best human directed and LLMs can provide a good 98% translation.</p>
+
+  <h2>Features</h2>
+  <ul>
+    <li>Native web components</li>
+    <li>Server Side Rendering</li>
+    <li>Accessibility</li>
+    <li>Optional styles</li>
+    <li>No Shadow DOM</li>
+    <li>Demo pages</li>
+  </ul>
+
+  <h2>Getting started</h2>
+  <pre><code set:html={`npm install @primavera-ui/components`} /></pre>
+  <pre><code set:html={`import { register } from "@primavera-ui/components/otp";
+register();`} /></pre>
+
+  <h2>Components</h2>
+  <ul>
+    <li><a href="/otp">OTP Input</a> — One-time password input with keyboard navigation, paste support, and accessibility.</li>
+  </ul>
+
+  <h2>Roadmap</h2>
+  <ul>
+    <li>Wrappers for front-end frameworks (React, SolidJS, Svelte)</li>
+    <li>Drag and drop component</li>
+  </ul>
+</Layout>
+
+<style is:global>
+  p {
+    color: #444;
+    line-height: 1.6;
+    max-width: 40rem;
+  }
+
+  ul {
+    padding-left: 1.25rem;
+  }
+
+  li {
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+  }
+
+  li a {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  li a:hover {
+    text-decoration: underline;
+  }
+
+  pre {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    font-size: 0.875rem;
+  }
+</style>

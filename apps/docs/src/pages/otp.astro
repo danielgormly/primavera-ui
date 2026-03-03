@@ -1,0 +1,157 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="OTP Input">
+  <h1>One-Time Password Input</h1>
+
+  <div class="style-switcher">
+    <button data-style="boxed" class="active">Boxed</button>
+    <button data-style="seamless">Seamless</button>
+  </div>
+
+  <div class="demo" data-style="boxed">
+    <primavera-otp autofocus>
+      <primavera-otp-input><input type="text" size="1" aria-label="Digit 1 of 6" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <primavera-otp-input><input type="text" size="1" aria-label="Digit 2 of 6" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <primavera-otp-input><input type="text" size="1" aria-label="Digit 3 of 6" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <span class="separator">-</span>
+      <primavera-otp-input><input type="text" size="1" aria-label="Digit 4 of 6" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <primavera-otp-input><input type="text" size="1" aria-label="Digit 5 of 6" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <primavera-otp-input><input type="text" size="1" aria-label="Digit 6 of 6" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+    </primavera-otp>
+  </div>
+
+  <pre><code set:html={`&lt;script&gt;
+  import { register } from "@primavera-ui/components/otp";
+  register();
+&lt;/script&gt;
+
+&lt;primavera-otp&gt;
+  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
+  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
+  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
+  &lt;span&gt;-&lt;/span&gt;
+  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
+  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
+  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
+&lt;/primavera-otp&gt;`} /></pre>
+</Layout>
+
+<style is:global>
+  /* ── shared ── */
+  primavera-otp {
+    display: flex;
+    align-items: center;
+  }
+
+  primavera-otp-input input {
+    height: 3rem;
+    width: 2.5rem;
+    text-align: center;
+    font-size: 1.25rem;
+  }
+
+  primavera-otp-input input:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: -2px;
+    z-index: 1;
+    position: relative;
+  }
+
+  /* ── boxed ── */
+  [data-style="boxed"] primavera-otp {
+    gap: 0.5rem;
+  }
+
+  [data-style="boxed"] primavera-otp-input input {
+    border: 1px solid #ccc;
+    border-radius: 0.5rem;
+  }
+
+  /* ── seamless ── */
+  [data-style="seamless"] primavera-otp {
+    gap: 0;
+  }
+
+  [data-style="seamless"] .separator {
+    display: flex;
+    align-items: center;
+    padding: 0 0.5rem;
+  }
+
+  [data-style="seamless"] primavera-otp-input input {
+    border: 1px solid #ccc;
+    border-radius: 0;
+    margin-left: -1px;
+  }
+
+  [data-style="seamless"] primavera-otp-input:first-of-type input {
+    margin-left: 0;
+    border-radius: 0.5rem 0 0 0.5rem;
+  }
+
+  [data-style="seamless"] .separator + primavera-otp-input input {
+    margin-left: 0;
+    border-radius: 0.5rem 0 0 0.5rem;
+  }
+
+  [data-style="seamless"] primavera-otp-input:last-of-type input {
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
+
+  [data-style="seamless"] primavera-otp-input:has(+ .separator) input {
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
+
+  /* ── switcher ── */
+  .style-switcher {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .style-switcher button {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 0.25rem;
+    background: white;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+
+  .style-switcher button.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+  }
+
+  .demo {
+    margin-bottom: 1.5rem;
+  }
+
+  pre {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    font-size: 0.875rem;
+  }
+</style>
+
+<script>
+  import { register } from "@primavera-ui/components/otp";
+  register();
+
+  const demo = document.querySelector(".demo")!;
+  const buttons = document.querySelectorAll<HTMLButtonElement>(".style-switcher button");
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      buttons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      demo.setAttribute("data-style", btn.dataset.style!);
+    });
+  });
+</script>
