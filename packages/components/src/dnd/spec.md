@@ -140,6 +140,8 @@ interface DragContext {
 - bottommost: the block with the lowest position in the list, i.e. blocks[last]
 - top(selection): shorthand for top(topmost)
 - bottom(selection): shorthand for bottom(bottommost)
+- to(block): the fluid end of a block (the end that moves on extend)
+
 
 #### Implicit states
 
@@ -179,6 +181,9 @@ addBlock(item)
 extendActive(item)
   active.to = item
   → merge
+  Note: this can grow or shrink the block depending on direction
+  relative to anchor. If item is between anchor and the current to,
+  the block contracts.
 
 toggleItem(item)
   if item ∈ active:
@@ -215,8 +220,8 @@ TODO: macOS vs WINDOWS/Linux, not macOS vs Linux
 | `↓` | `↓` | selected | `selectOnly(next(selBottom))` |
 | `↑` | `↑` | selected | `selectOnly(prev(selTop))` |
 | `shift+click` | `shift+click` | any | `extendActive(item)` |
-| `shift+↓` | `shift+↓` | any | `extendActive(next(bottom(active)))` |
-| `shift+↑` | `shift+↑` | any | `extendActive(prev(top(active)))` |
+| `shift+↓` | `shift+↓` | any | `extendActive(next(to(active)))` |
+| `shift+↑` | `shift+↑` | any | `extendActive(prev(to(active)))` |
 | `shift+⌘+↓` | `shift+ctrl+↓` | any | `extendActive(last)` |
 | `shift+⌘+↑` | `shift+ctrl+↑` | any | `extendActive(first)` |
 | `⌘+click` | `ctrl+click` | item ∉ selection | `addBlock(item)` |
