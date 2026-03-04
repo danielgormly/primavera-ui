@@ -7,6 +7,7 @@ export default defineConfig({
       entry: {
         index: resolve(__dirname, "src/index.ts"),
         otp: resolve(__dirname, "src/otp/index.ts"),
+        dnd: resolve(__dirname, "src/dnd/index.ts"),
       },
       formats: ["es"],
     },

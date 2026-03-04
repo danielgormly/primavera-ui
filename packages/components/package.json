@@ -11,6 +11,10 @@
     "./otp": {
       "types": "./dist/otp/index.d.ts",
       "import": "./dist/otp.js"
+    },
+    "./dnd": {
+      "types": "./dist/dnd/index.d.ts",
+      "import": "./dist/dnd.js"
     }
   },
   "scripts": {

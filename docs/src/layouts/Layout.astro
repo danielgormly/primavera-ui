@@ -27,6 +27,7 @@ const pathname = Astro.url.pathname;
       <a href="/" class:list={["nav-link", { active: pathname === "/" }]}>primavera-ui</a>
       <a href="/" class:list={["nav-link", { active: pathname === "/" }]}>Intro</a>
       <a href="/otp" class:list={["nav-link", { active: pathname.startsWith("/otp") }]}>OTP</a>
+      <a href="/dnd" class:list={["nav-link", { active: pathname.startsWith("/dnd") }]}>DnD</a>
       <button id="theme-toggle" aria-label="Toggle theme"></button>
     </nav>
     <main>

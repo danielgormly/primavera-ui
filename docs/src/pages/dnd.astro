@@ -1,0 +1,294 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Drag & Drop List">
+  <h1>Drag & Drop List</h1>
+  <p>Virtualized, multi-select drag-and-drop list. Try clicking, shift-clicking, dragging, and using keyboard shortcuts.</p>
+
+  <div class="demo">
+    <primavera-dnd id="dnd-demo" item-height="40" drag-type="overlay" autofocus></primavera-dnd>
+  </div>
+
+  <div class="controls">
+    <button id="add-btn">Add item</button>
+    <button id="reset-btn">Reset</button>
+  </div>
+
+  <h2>Interactions</h2>
+  <table>
+    <thead>
+      <tr><th>Action</th><th>macOS</th><th>Windows / Linux</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Select item</td><td colspan="2">Click</td></tr>
+      <tr><td>Extend selection</td><td colspan="2">Shift + Click</td></tr>
+      <tr><td>Toggle item</td><td>Cmd + Click</td><td>Ctrl + Click</td></tr>
+      <tr><td>Navigate</td><td colspan="2">Arrow Up / Down</td></tr>
+      <tr><td>Extend with keyboard</td><td colspan="2">Shift + Arrow</td></tr>
+      <tr><td>Move selection</td><td>Cmd + Arrow</td><td>Ctrl + Arrow</td></tr>
+      <tr><td>Select first / last</td><td>Option + Arrow</td><td>Alt + Arrow</td></tr>
+      <tr><td>Drag</td><td colspan="2">Click &amp; hold, then drag</td></tr>
+      <tr><td>Clear selection</td><td colspan="2">Escape</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Usage</h2>
+  <pre><code set:html={`import { register, DndSource } from "@primavera-ui/components/dnd";
+register();
+
+const items = [
+  { key: "1", label: "Item 1" },
+  { key: "2", label: "Item 2" },
+  { key: "3", label: "Item 3" },
+];
+
+const keyIndex = new Map(items.map((i) => [i.key, i]));
+
+const source = new DndSource({
+  getKey: (item) => item.key,
+  getOrder: () => items.map((i) => i.key),
+  getItem: (key) => keyIndex.get(key),
+});
+
+const renderer = {
+  mount(key, item, container) {
+    container.textContent = item.label;
+    return () => {};
+  },
+};
+
+const el = document.querySelector("primavera-dnd");
+el.setSource(source);
+el.setRenderer(renderer);`} /></pre>
+</Layout>
+
+<style is:global>
+  p {
+    color: #444;
+    line-height: 1.6;
+    max-width: 40rem;
+  }
+
+  html[data-theme="dark"] p {
+    color: #aaa;
+  }
+
+  .demo {
+    margin-bottom: 1rem;
+    border: 1px solid #e5e5e5;
+    border-radius: 0.5rem;
+    height: 400px;
+    max-width: 32rem;
+    overflow: hidden;
+  }
+
+  html[data-theme="dark"] .demo {
+    border-color: #333;
+  }
+
+  .controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .controls button {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 0.25rem;
+    background: white;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+
+  .controls button:hover {
+    background: #f5f5f5;
+  }
+
+  html[data-theme="dark"] .controls button {
+    background: #333;
+    border-color: #555;
+    color: #e5e5e5;
+  }
+
+  html[data-theme="dark"] .controls button:hover {
+    background: #444;
+  }
+
+  /* DnD item styles */
+  #dnd-demo [role="option"] {
+    display: flex;
+    align-items: center;
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    cursor: default;
+    user-select: none;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  html[data-theme="dark"] #dnd-demo [role="option"] {
+    border-bottom-color: #2a2a2a;
+  }
+
+  #dnd-demo [role="option"][aria-selected="true"] {
+    background: #dbeafe;
+  }
+
+  html[data-theme="dark"] #dnd-demo [role="option"][aria-selected="true"] {
+    background: #1e3a5f;
+  }
+
+  #dnd-demo .item-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    height: 100%;
+  }
+
+  #dnd-demo .item-handle {
+    color: #999;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  #dnd-demo .item-label {
+    flex: 1;
+  }
+
+  #dnd-demo .item-index {
+    color: #999;
+    font-size: 0.75rem;
+  }
+
+  /* Table */
+  table {
+    border-collapse: collapse;
+    margin-bottom: 2rem;
+    font-size: 0.875rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #e5e5e5;
+  }
+
+  th {
+    font-weight: 600;
+  }
+
+  html[data-theme="dark"] th,
+  html[data-theme="dark"] td {
+    border-bottom-color: #333;
+  }
+
+  pre {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    font-size: 0.875rem;
+  }
+</style>
+
+<script>
+  import { register, DndSource } from "@primavera-ui/components/dnd";
+  register();
+
+  type Item = { key: string; label: string };
+
+  // Generate initial items
+  let nextId = 1;
+  const items: Item[] = [];
+  const keyIndex = new Map<string, Item>();
+
+  function addItem() {
+    const id = String(nextId++);
+    const item: Item = { key: id, label: `Item ${id}` };
+    items.push(item);
+    keyIndex.set(id, item);
+  }
+
+  for (let i = 0; i < 50; i++) addItem();
+
+  const source = new DndSource<Item>({
+    getKey: (item) => item.key,
+    getOrder: () => items.map((i) => i.key),
+    getItem: (key) => keyIndex.get(key),
+  });
+
+  // Keep items array in sync with source moves
+  source.onChange((op) => {
+    if (op.type === "move") {
+      const movedItems = op.keys.map((k) => keyIndex.get(k)!);
+      // Remove moved items
+      for (const k of op.keys) {
+        const idx = items.findIndex((i) => i.key === k);
+        if (idx !== -1) items.splice(idx, 1);
+      }
+      // Insert at new position
+      if (op.beforeKey === null) {
+        items.push(...movedItems);
+      } else {
+        const idx = items.findIndex((i) => i.key === op.beforeKey);
+        if (idx !== -1) {
+          items.splice(idx, 0, ...movedItems);
+        } else {
+          items.push(...movedItems);
+        }
+      }
+      source.syncOrder();
+    }
+  });
+
+  const renderer = {
+    mount(key: string, item: Item, container: HTMLElement) {
+      const row = document.createElement("div");
+      row.className = "item-row";
+
+      const handle = document.createElement("span");
+      handle.className = "item-handle";
+      handle.textContent = "⠿";
+
+      const label = document.createElement("span");
+      label.className = "item-label";
+      label.textContent = item.label;
+
+      row.appendChild(handle);
+      row.appendChild(label);
+      container.appendChild(row);
+
+      return () => {
+        row.remove();
+      };
+    },
+  };
+
+  const el = document.querySelector<HTMLElement>("#dnd-demo")!;
+  (el as any).setSource(source);
+  (el as any).setRenderer(renderer);
+
+  // Controls
+  document.getElementById("add-btn")!.addEventListener("click", () => {
+    addItem();
+    const newItem = items[items.length - 1];
+    const txnId = source.apply([{ type: "insert", items: [newItem], beforeKey: null }]);
+    source._commitUI(txnId);
+    source._commitState(txnId);
+    source.syncOrder();
+  });
+
+  document.getElementById("reset-btn")!.addEventListener("click", () => {
+    items.length = 0;
+    keyIndex.clear();
+    nextId = 1;
+    for (let i = 0; i < 50; i++) addItem();
+    const txnId = source.apply([{ type: "reset", keys: items.map((i) => i.key) }]);
+    source._commitUI(txnId);
+    source._commitState(txnId);
+    source.syncOrder();
+  });
+</script>
