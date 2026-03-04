@@ -608,6 +608,13 @@ export class PrimaveraDnd extends HTMLElement {
     if (!this.source || e.button !== 0) return;
     if (this.dragType === "native") return; // native drag handles itself
 
+    // Shift/cmd clicks are handled entirely by onClick
+    const isMac =
+      typeof navigator !== "undefined" &&
+      /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+    const modKey = isMac ? e.metaKey : e.ctrlKey;
+    if (e.shiftKey || modKey) return;
+
     const key = this.getKeyFromEvent(e);
     if (key === null) return;
 

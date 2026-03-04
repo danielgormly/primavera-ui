@@ -59,6 +59,12 @@ The canvas is positioned absolutely and draws at viewport-relative coordinates (
 
 The canvas CSS dimensions are set explicitly via a `ResizeObserver` on the scroll container's `contentRect` (viewport size, not scroll height). This ensures the canvas covers exactly the visible area.
 
+## Mouse event ordering: mousedown vs click
+
+`mousedown` fires before `click`. If `mousedown` unconditionally selects or sets up drag state, it will clobber the existing selection before `click` can inspect shift/cmd modifiers.
+
+**Implementation note:** `mousedown` should bail early when shift or the platform modifier key (cmd on macOS, ctrl on Windows/Linux) is held. Let `click` handle all modified clicks (shift+click for extend, cmd/ctrl+click for toggle). `mousedown` only handles plain clicks — selecting unselected items and setting up drag initiation state.
+
 ### Placeholder height matches item height
 
 The placeholder is a filled rectangle the full height of one item, not a thin line. The canvas must receive `itemHeight` and draw with `fillRect(0, y, canvasWidth, itemHeight)`. This gives clear visual feedback of the drop slot size.
