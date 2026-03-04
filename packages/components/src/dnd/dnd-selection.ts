@@ -244,6 +244,9 @@ export class DndSelection {
   private merge(): void {
     if (this.blocks.length <= 1) return;
 
+    // Preserve active's anchor before merge
+    const activeAnchor = this.active?.anchor ?? null;
+
     // Sort blocks by their top position
     this.blocks.sort(
       (a, b) => this.blockTop(a) - this.blockTop(b),
@@ -251,7 +254,7 @@ export class DndSelection {
 
     const merged: Block[] = [];
     let current = this.blocks[0];
-    let currentActiveConsumed = this.active === current;
+    let currentHasActive = this.active === current;
 
     for (let i = 1; i < this.blocks.length; i++) {
       const next = this.blocks[i];
@@ -262,22 +265,32 @@ export class DndSelection {
         // Adjacent or overlapping — merge
         const newTop = this.blockTop(current);
         const newBottom = Math.max(currentBottom, this.blockBottom(next));
-        current = {
-          anchor: this.indexToKey[newTop],
-          to: this.indexToKey[newBottom],
-        };
-        if (this.active === next) currentActiveConsumed = true;
+        if (this.active === next) currentHasActive = true;
+
+        if (currentHasActive && activeAnchor !== null) {
+          // Preserve active's anchor; to = opposite end of merged range
+          const anchorIdx = this.orderIndex.get(activeAnchor) ?? newTop;
+          const toIdx = anchorIdx === newTop ? newBottom : newTop;
+          current = {
+            anchor: activeAnchor,
+            to: this.indexToKey[toIdx],
+          };
+        } else {
+          current = {
+            anchor: this.indexToKey[newTop],
+            to: this.indexToKey[newBottom],
+          };
+        }
       } else {
         merged.push(current);
         current = next;
-        currentActiveConsumed = this.active === next;
+        currentHasActive = this.active === next;
       }
     }
     merged.push(current);
 
-    // Update active if it was consumed
-    if (currentActiveConsumed || !merged.includes(this.active!)) {
-      // Find the merged block that contains the original active
+    // Update active to the merged block that contains it
+    if (currentHasActive || !merged.includes(this.active!)) {
       if (this.active) {
         const activeTop = this.blockTop(this.active);
         for (const b of merged) {
