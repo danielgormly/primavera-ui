@@ -148,8 +148,8 @@ export class PrimaveraDnd extends HTMLElement {
     this.dragOverlay = new DndDragOverlay(this.dragStackCount);
     this.touch = new DndTouch();
 
-    // Insert canvas
-    this.parent.insertBefore(this.canvas.getElement(), this.listbox);
+    // Insert canvas as sibling of parent (outside scroll container)
+    this.appendChild(this.canvas.getElement());
 
     // Resize observer for canvas
     this.resizeObserver = new ResizeObserver((entries) => {
@@ -195,7 +195,10 @@ export class PrimaveraDnd extends HTMLElement {
   }
 
   private setupDOM(): void {
-    // Parent container
+    // The custom element itself is the positioning context
+    this.style.cssText = "position:relative;display:block;height:100%;";
+
+    // Parent container (scroll viewport)
     this.parent = document.createElement("div");
     this.parent.className = "dnd-parent";
     this.parent.style.cssText =

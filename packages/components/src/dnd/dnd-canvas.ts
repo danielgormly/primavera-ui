@@ -12,7 +12,7 @@ export class DndCanvas {
   ) {
     this.canvas = document.createElement("canvas");
     this.canvas.style.cssText =
-      "position:absolute;top:0;left:0;width:100%;pointer-events:none;";
+      "position:absolute;top:0;left:0;pointer-events:none;z-index:1;";
     this.ctx = this.canvas.getContext("2d")!;
   }
 
@@ -23,6 +23,8 @@ export class DndCanvas {
   /** Sync canvas bitmap size to its layout size. Call on resize. */
   resize(width: number, height: number): void {
     const dpr = window.devicePixelRatio || 1;
+    this.canvas.style.width = `${width}px`;
+    this.canvas.style.height = `${height}px`;
     this.canvas.width = width * dpr;
     this.canvas.height = height * dpr;
     this.ctx.scale(dpr, dpr);
