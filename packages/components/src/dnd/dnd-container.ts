@@ -139,7 +139,7 @@ export class PrimaveraDnd extends HTMLElement {
   private init(): void {
     this.setupDOM();
     this.virtualization = new DndVirtualization(this.itemHeight, this.overscan);
-    this.canvas = new DndCanvas();
+    this.canvas = new DndCanvas(this.itemHeight);
     this.autoscroll = new DndAutoscroll(
       this.parent,
       this.autoscrollBuffer,

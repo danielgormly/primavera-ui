@@ -7,8 +7,8 @@ export class DndCanvas {
   private ctx: CanvasRenderingContext2D;
 
   constructor(
+    private itemHeight: number,
     private color = "var(--dnd-placeholder-color, #3b82f6)",
-    private lineHeight = 2,
   ) {
     this.canvas = document.createElement("canvas");
     this.canvas.style.cssText =
@@ -46,7 +46,7 @@ export class DndCanvas {
 
     this.ctx.fillStyle = resolved;
     const canvasW = this.canvas.width / (window.devicePixelRatio || 1);
-    this.ctx.fillRect(0, y - this.lineHeight / 2, canvasW, this.lineHeight);
+    this.ctx.fillRect(0, y, canvasW, this.itemHeight);
   }
 
   clear(): void {

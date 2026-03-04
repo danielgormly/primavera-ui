@@ -37,3 +37,28 @@ The canvas placeholder line is drawn at `hoverIndex * itemHeight - scrollTop`. W
 During drag, dragged items are hidden (`opacity: 0`, `pointer-events: none`) but remain in the DOM with their **pre-drag** `top` value. Since items have `transition: top 0.15s ease`, restoring visibility after the move op causes a visible flash — the item appears at its old position and animates to the new one.
 
 **Fix:** when drag ends, remove dragged items from the DOM (and the rendered item cache) **before** clearing drag state and calling `renderList()`. The render pass then re-mounts them as fresh elements at their correct new position. Fresh mounts have no prior `top` to transition from, so there is no flash. This also avoids fragile transition-suppression hacks (`transition: none` + `requestAnimationFrame` restore) which can interfere with subsequent animations.
+
+## Canvas positioning and sizing
+
+The canvas renders a placeholder rectangle showing where dragged items will land. Two layout constraints must be satisfied:
+
+### Canvas must be outside the scroll container
+
+The canvas is positioned absolutely and draws at viewport-relative coordinates (`hoverIndex * itemHeight - scrollTop`). If the canvas is a child of the scroll container, it scrolls with the content, causing the placeholder to drift as the user scrolls during drag.
+
+**Fix:** the canvas is a sibling of the scroll container (`parent`), not a child. The custom element itself (`<primavera-dnd>`) is the positioning context (`position:relative; display:block`). The DOM structure is:
+
+```
+<primavera-dnd style="position:relative; display:block; height:100%">
+  <div class="dnd-parent" style="overflow-y:auto; height:100%">
+    <div role="listbox">...</div>
+  </div>
+  <canvas style="position:absolute; top:0; left:0; z-index:1; pointer-events:none" />
+</primavera-dnd>
+```
+
+The canvas CSS dimensions are set explicitly via a `ResizeObserver` on the scroll container's `contentRect` (viewport size, not scroll height). This ensures the canvas covers exactly the visible area.
+
+### Placeholder height matches item height
+
+The placeholder is a filled rectangle the full height of one item, not a thin line. The canvas must receive `itemHeight` and draw with `fillRect(0, y, canvasWidth, itemHeight)`. This gives clear visual feedback of the drop slot size.
