@@ -4,7 +4,7 @@ Primavera is a spec-first component library with plain JS web component implemen
 
 I am building this because while frameworks can offer code reuse and ergonomic patterns, the component's shape must be bent somewhat to the framework and in many cases, the component is deployed in an environment that does not make use of the framework again. I believe detailed specification for human user interfaces is best human assisted & directed and LLMs can provide a good 98% translation.
 
-So far I have only built 2 components.
+So far I have only built 2 components - OTP + DnD
 
 ### Features:
 - Native web components
