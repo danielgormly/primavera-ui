@@ -493,15 +493,12 @@ export class PrimaveraDnd extends HTMLElement {
       }
 
       case "extend": {
-        const activeEdge =
-          action.direction === "down"
-            ? this.selection.activeBottom()
-            : this.selection.activeTop();
-        if (activeEdge !== null) {
+        const activeBlock = this.selection.getActiveBlock();
+        if (activeBlock !== null) {
           const target =
             action.direction === "down"
-              ? this.selection.next(activeEdge)
-              : this.selection.prev(activeEdge);
+              ? this.selection.next(activeBlock.to)
+              : this.selection.prev(activeBlock.to);
           this.selection.extendActive(target);
           this.scrollToKey(target);
         } else {
