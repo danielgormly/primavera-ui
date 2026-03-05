@@ -228,6 +228,7 @@ TODO: macOS vs WINDOWS/Linux, not macOS vs Linux
 | `⌘+click` | `ctrl+click` | item ∈ selection | `toggleItem(item)` |
 | `⌘+↓` | `ctrl+↓` | any | `moveSelection(down)` |
 | `⌘+↑` | `ctrl+↑` | any | `moveSelection(up)` |
+| `⌘+a` | `ctrl+a` | any | `selectAll()` — single block from first to last |
 | `escape` | `escape` | any | `blocks = []; active = null` |
 
 Every keyboard action that changes the selection or moves items must scroll the leading edge into view (e.g. top of selection when moving up, bottom when moving down).

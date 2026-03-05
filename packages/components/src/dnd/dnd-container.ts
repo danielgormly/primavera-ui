@@ -554,6 +554,9 @@ export class PrimaveraDnd extends HTMLElement {
         this.handleMoveSelection(action.direction);
         break;
 
+      case "select-all":
+        this.selection.selectAll();
+        break;
       case "clear":
         this.selection.clear();
         break;

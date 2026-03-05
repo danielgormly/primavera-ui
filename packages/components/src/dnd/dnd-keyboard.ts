@@ -7,6 +7,7 @@ export type DndKeyAction =
   | { type: "extend-to-last" }
   | { type: "mod-click" } // cmd+click or ctrl+click — handled by mouse, not keyboard
   | { type: "move-selection"; direction: "up" | "down" }
+  | { type: "select-all" }
   | { type: "clear" }
   | { type: "ignore" };
 
@@ -20,6 +21,11 @@ export function mapDndKeyEvent(e: KeyboardEvent): DndKeyAction {
   // Escape — clear selection
   if (e.key === "Escape") {
     return { type: "clear" };
+  }
+
+  // Mod + A — select all
+  if (mod && e.key === "a") {
+    return { type: "select-all" };
   }
 
   // Alt/Option + Arrow — jump to first/last

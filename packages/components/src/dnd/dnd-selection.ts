@@ -132,6 +132,16 @@ export class DndSelection {
     this.merge();
   }
 
+  selectAll(): void {
+    if (this.indexToKey.length === 0) return;
+    const block: Block = {
+      anchor: this.indexToKey[0],
+      to: this.indexToKey[this.indexToKey.length - 1],
+    };
+    this.blocks = [block];
+    this.active = block;
+  }
+
   clear(): void {
     this.blocks = [];
     this.active = null;
