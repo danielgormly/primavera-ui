@@ -204,7 +204,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.parent = document.createElement("div");
     this.parent.className = "dnd-parent";
     this.parent.style.cssText =
-      "position:relative;overflow-y:auto;height:100%;";
+      "position:relative;overflow-y:auto;height:100%;z-index:2;";
 
     // Listbox
     this.listbox = document.createElement("div");

@@ -108,7 +108,7 @@ interface DragContext {
 
 ## Markup/Sizing
 1. Regular list structure comprised of `parent` container `<div class="parent">` , the `<div role="listbox">` list and `<div role="option">` listitems.
-2. A 2D canvas with identical dimensions to parent div sits directly behind parent div, anchored to same position. (position: absolute). This is a deliberate choice to make animations smooth and keep DOM layout simple.
+2. A 2D canvas with identical dimensions to parent div sits directly behind parent div, anchored to same position. (position: absolute, z-index: 1). The scroll container must have a higher z-index (e.g. 2) so its scrollbar renders above the canvas. This is a deliberate choice to make animations smooth and keep DOM layout simple.
 3. The `parent` has `overflow-y: scroll` and is sized by the component consumer. Scroll position can be modified natively.
 4. `listitem` are a fixed size and absolutely positioned, determined by their `top` px value. There is a `transition` on `top` of 0.15s to support smooth movement as surrounding list items are added, moved and removed.
 5. The height of `list` is defined by `max((qty(visibleItems) + 2) * height(listitem), height(parent))`. The 2 is for a small amount of buffer at the end of a list. The `max` with parent height ensures the list always fills the scroll container, even when most items are hidden (e.g. during drag with many selected items).
@@ -229,6 +229,8 @@ TODO: macOS vs WINDOWS/Linux, not macOS vs Linux
 | `⌘+↓` | `ctrl+↓` | any | `moveSelection(down)` |
 | `⌘+↑` | `ctrl+↑` | any | `moveSelection(up)` |
 | `escape` | `escape` | any | `blocks = []; active = null` |
+
+Every keyboard action that changes the selection or moves items must scroll the leading edge into view (e.g. top of selection when moving up, bottom when moving down).
 
 Custom bindings by consumer should be accounted for in kb interface.
 
