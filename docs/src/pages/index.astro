@@ -1,66 +1,40 @@
 ---
-import Layout from "../layouts/Layout.astro";
+import Layout from '../layouts/Layout.astro';
+import { Content as Readme } from '../../../readme.md';
 ---
-
 <Layout title="Introduction">
-  <h1>primavera-ui</h1>
-  <p>Primavera is a spec-first component library with plain JS web component implementations. Spec is handwritten, opinionated, and relatively informal — markdown files. Implementations are vibe-coded based on spec then tested & further refined.</p>
-  <p>I am building this because I have a need for framework-free components and I believe detailed specification for human user interfaces is best human directed and LLMs can provide a good 98% translation.</p>
-
-  <h2>Features</h2>
-  <ul>
-    <li>Native web components</li>
-    <li>Server Side Rendering</li>
-    <li>Accessibility</li>
-    <li>Optional styles</li>
-    <li>No Shadow DOM</li>
-    <li>Demo pages</li>
-  </ul>
-
-  <h2>Getting started</h2>
-  <pre><code set:html={`npm install @primavera-ui/components`} /></pre>
-  <pre><code set:html={`import { register } from "@primavera-ui/components/otp";
-register();`} /></pre>
-
-  <h2>Components</h2>
-  <ul>
-    <li><a href={`${import.meta.env.BASE_URL}otp`}>OTP Input</a> — One-time password input with keyboard navigation, paste support, and accessibility.</li>
-    <li><a href={`${import.meta.env.BASE_URL}dnd`}>Drag &amp; Drop List</a> — Virtualized, multi-select drag-and-drop list with keyboard navigation and touch support.</li>
-  </ul>
-
-  <h2>Roadmap</h2>
-  <ul>
-    <li>Wrappers for front-end frameworks (React, SolidJS, Svelte)</li>
-  </ul>
+  <div class="readme">
+    <Readme />
+  </div>
 </Layout>
 
 <style is:global>
-  p {
-    color: #444;
-    line-height: 1.6;
+  .readme {
     max-width: 40rem;
   }
-
-  ul {
+  .readme p {
+    color: #444;
+    line-height: 1.6;
+  }
+  html[data-theme="dark"] .readme p {
+    color: #bbb;
+  }
+  .readme ul {
     padding-left: 1.25rem;
   }
-
-  li {
+  .readme li {
     margin-bottom: 0.5rem;
     line-height: 1.5;
   }
-
-  li a {
+  .readme a {
     color: #3b82f6;
     text-decoration: none;
     font-weight: 500;
   }
-
-  li a:hover {
+  .readme a:hover {
     text-decoration: underline;
   }
-
-  pre {
+  .readme pre {
     background: #1e1e1e;
     color: #d4d4d4;
     padding: 1rem;

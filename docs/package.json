@@ -10,5 +10,8 @@
   "dependencies": {
     "@primavera-ui/components": "workspace:*",
     "astro": "^5"
+  },
+  "devDependencies": {
+    "astro-expressive-code": "^0.41.7"
   }
 }

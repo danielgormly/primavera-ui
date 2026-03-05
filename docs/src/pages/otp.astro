@@ -4,13 +4,14 @@ import Layout from "../layouts/Layout.astro";
 
 <Layout title="OTP Input">
   <h1>One-Time Password Input</h1>
+  <p>See <a href="https://github.com/danielgormly/primavera-ui/blob/main/packages/components/src/otp/spec.md">spec</a>.</p>
 
   <div class="style-switcher">
-    <button data-style="boxed" class="active">Boxed</button>
-    <button data-style="seamless">Seamless</button>
+    <button data-style="seamless" class="active">Seamless</button>
+    <button data-style="boxed">Boxed</button>
   </div>
 
-  <div class="demo" data-style="boxed">
+  <div class="demo" data-style="seamless">
     <primavera-otp autofocus>
       <primavera-otp-input><input type="text" size="1" aria-label="Digit 1 of 6" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
       <primavera-otp-input><input type="text" size="1" aria-label="Digit 2 of 6" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>

@@ -2,7 +2,7 @@
 interface Props {
   title: string;
 }
-
+import prodyFont from '../fonts/Prody-Medium.woff2';
 const { title } = Astro.props;
 const pathname = Astro.url.pathname;
 ---
@@ -13,6 +13,14 @@ const pathname = Astro.url.pathname;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title} - primavera-ui</title>
+    <style set:html={`
+      @font-face {
+        font-family: "Prody";
+        font-style: normal;
+        font-weight: 500;
+        src: url("${prodyFont}") format("woff2");
+      }
+    `} />
     <script is:inline>
       (function() {
         const theme = localStorage.getItem("theme");
@@ -24,10 +32,10 @@ const pathname = Astro.url.pathname;
   </head>
   <body>
     <nav>
-      <a href="/" class:list={["nav-link", { active: pathname === "/" }]}>primavera-ui</a>
-      <a href="/" class:list={["nav-link", { active: pathname === "/" }]}>Intro</a>
-      <a href="/otp" class:list={["nav-link", { active: pathname.startsWith("/otp") }]}>OTP</a>
-      <a href="/dnd" class:list={["nav-link", { active: pathname.startsWith("/dnd") }]}>DnD</a>
+      <a href={`${import.meta.env.BASE_URL}/`} class:list={["nav-link", { active: pathname === `${import.meta.env.BASE_URL}/` }]}>primavera-ui</a>
+      <a href={`${import.meta.env.BASE_URL}/`} class:list={["nav-link", { active: pathname === `${import.meta.env.BASE_URL}/` }]}>Intro</a>
+      <a href={`${import.meta.env.BASE_URL}/otp`} class:list={["nav-link", { active: pathname.startsWith(`${import.meta.env.BASE_URL}/otp`) }]}>OTP</a>
+      <a href={`${import.meta.env.BASE_URL}/dnd`} class:list={["nav-link", { active: pathname.startsWith(`${import.meta.env.BASE_URL}/dnd`) }]}>DnD</a>
       <button id="theme-toggle" aria-label="Toggle theme"></button>
     </nav>
     <main>
@@ -39,6 +47,10 @@ const pathname = Astro.url.pathname;
 <style is:global>
   html[data-theme="dark"] {
     color-scheme: dark;
+  }
+
+  h1 {
+    font-family: "Prody", system-ui, sans-serif;
   }
 
   body {
@@ -58,49 +70,18 @@ const pathname = Astro.url.pathname;
     align-items: center;
     gap: 1rem;
     padding: 0.75rem 2rem;
-    border-bottom: 1px solid #e5e5e5;
-    background: white;
-  }
-
-  html[data-theme="dark"] nav {
-    background: #222;
-    border-bottom-color: #333;
   }
 
   nav .nav-link {
     font-size: 0.875rem;
-    color: #666;
+    color: inherit;
     text-decoration: none;
     padding: 0.25rem 0;
-    border-bottom: 2px solid transparent;
   }
 
   nav .nav-link:first-child {
     font-weight: 600;
-    color: #111;
     margin-right: 1rem;
-    border-bottom: none;
-  }
-
-  html[data-theme="dark"] nav .nav-link {
-    color: #999;
-  }
-
-  html[data-theme="dark"] nav .nav-link:first-child {
-    color: #e5e5e5;
-  }
-
-  nav .nav-link:hover {
-    color: #111;
-  }
-
-  html[data-theme="dark"] nav .nav-link:hover {
-    color: #e5e5e5;
-  }
-
-  nav .nav-link.active {
-    color: #3b82f6;
-    border-bottom-color: #3b82f6;
   }
 
   #theme-toggle {
