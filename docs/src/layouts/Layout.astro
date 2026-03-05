@@ -24,8 +24,12 @@ const pathname = Astro.url.pathname;
     <script is:inline>
       (function() {
         const theme = localStorage.getItem("theme");
-        if (theme === "dark" || (!theme && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+        const isDark = theme === "dark" || (!theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (isDark) {
           document.documentElement.setAttribute("data-theme", "dark");
+          document.documentElement.setAttribute("data-code-theme", "kanagawa-dragon");
+        } else {
+          document.documentElement.setAttribute("data-code-theme", "min-light");
         }
       })();
     </script>
@@ -33,13 +37,18 @@ const pathname = Astro.url.pathname;
   <body>
     <nav>
       <a href={`${import.meta.env.BASE_URL}/`} class:list={["nav-link", { active: pathname === `${import.meta.env.BASE_URL}/` }]}>primavera-ui</a>
-      <a href={`${import.meta.env.BASE_URL}/`} class:list={["nav-link", { active: pathname === `${import.meta.env.BASE_URL}/` }]}>Intro</a>
+      <a href={`${import.meta.env.BASE_URL}/`} class:list={["nav-link", { active: pathname === `${import.meta.env.BASE_URL}/` }]}>Readme</a>
       <a href={`${import.meta.env.BASE_URL}/otp`} class:list={["nav-link", { active: pathname.startsWith(`${import.meta.env.BASE_URL}/otp`) }]}>OTP</a>
       <a href={`${import.meta.env.BASE_URL}/dnd`} class:list={["nav-link", { active: pathname.startsWith(`${import.meta.env.BASE_URL}/dnd`) }]}>DnD</a>
       <button id="theme-toggle" aria-label="Toggle theme"></button>
     </nav>
     <main>
-      <slot />
+      <div class="content">
+        <slot />
+      </div>
+      {Astro.slots.has('sidebar') && <aside class="sidebar">
+        <slot name="sidebar" />
+      </aside>}
     </main>
   </body>
 </html>
@@ -54,7 +63,7 @@ const pathname = Astro.url.pathname;
   }
 
   body {
-    font-family: system-ui, sans-serif;
+    font-family: "PingFang HK", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     margin: 0;
     background: #fafafa;
     color: #111;
@@ -87,20 +96,135 @@ const pathname = Astro.url.pathname;
   #theme-toggle {
     margin-left: auto;
     background: none;
-    border: 1px solid #ccc;
-    border-radius: 0.25rem;
+    border: none;
+    outline: none;
     padding: 0.25rem 0.5rem;
     cursor: pointer;
+    font-family: inherit;
     font-size: 1rem;
     line-height: 1;
-  }
-
-  html[data-theme="dark"] #theme-toggle {
-    border-color: #555;
+    color: inherit;
   }
 
   main {
+    display: flex;
+    gap: 2rem;
     padding: 2rem;
+  }
+
+  .content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sidebar {
+    width: 14rem;
+    flex-shrink: 0;
+    position: sticky;
+    top: 2rem;
+    align-self: flex-start;
+    font-size: 0.8125rem;
+    padding: 2em 1em;
+    border-radius: 0.5em;
+    box-shadow: 0 0 0 1px color-mix(in oklab, #0000330f, #f0f0f3 25%), 0 12px 60px #00000026, 0 12px 32px -16px #0009321f;
+  }
+
+  @media (max-width: 768px) {
+    .sidebar {
+      display: none;
+    }
+  }
+
+  .sidebar:empty {
+    display: none;
+  }
+
+  .sidebar h3 {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #999;
+    margin: 0 0 0.5rem;
+  }
+
+  .sidebar label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    cursor: pointer;
+  }
+
+  .sidebar .toggle {
+    appearance: none;
+    width: 2rem;
+    height: 1rem;
+    background: #ccc;
+    border-radius: 0.5rem;
+    position: relative;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    flex-shrink: 0;
+  }
+
+  .sidebar .toggle::after {
+    content: "";
+    position: absolute;
+    width: 0.75rem;
+    height: 0.75rem;
+    background: white;
+    border-radius: 50%;
+    top: 0.125rem;
+    left: 0.125rem;
+    transition: transform 0.15s;
+  }
+
+  .sidebar .toggle:checked {
+    background: #3b82f6;
+  }
+
+  .sidebar .toggle:checked::after {
+    transform: translateX(1rem);
+  }
+
+  html[data-theme="dark"] .sidebar .toggle {
+    background: #555;
+  }
+
+  html[data-theme="dark"] .sidebar .toggle:checked {
+    background: #3b82f6;
+  }
+
+  .sidebar button {
+    width: 100%;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid #e5e5e5;
+    border-radius: 0.25rem;
+    background: white;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    color: inherit;
+    margin-bottom: 0.25rem;
+  }
+
+  .sidebar button:hover {
+    background: #f5f5f5;
+  }
+
+  html[data-theme="dark"] .sidebar button {
+    background: #2a2a2a;
+    border-color: #444;
+  }
+
+  html[data-theme="dark"] .sidebar button:hover {
+    background: #333;
+  }
+
+  .sidebar input[type="range"] {
+    width: 100%;
+    margin: 0.25rem 0 0.5rem;
   }
 </style>
 
@@ -119,6 +243,8 @@ const pathname = Astro.url.pathname;
     set(theme: string) {
       this.active = theme;
       document.documentElement.setAttribute("data-theme", theme);
+      let codeTheme = theme === 'light' ? 'min-light' : 'kanagawa-dragon';
+      document.documentElement.setAttribute("data-code-theme", codeTheme);
       localStorage.setItem("theme", theme);
       this.updateIcon();
     }

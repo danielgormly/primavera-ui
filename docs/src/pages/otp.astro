@@ -1,12 +1,14 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import { Code } from "astro-expressive-code/components";
 ---
 
 <Layout title="OTP Input">
   <h1>One-Time Password Input</h1>
   <p>See <a href="https://github.com/danielgormly/primavera-ui/blob/main/packages/components/src/otp/spec.md">spec</a>.</p>
 
-  <div class="style-switcher">
+  <div slot="sidebar">
+    <h3>Style</h3>
     <button data-style="seamless" class="active">Seamless</button>
     <button data-style="boxed">Boxed</button>
   </div>
@@ -23,20 +25,20 @@ import Layout from "../layouts/Layout.astro";
     </primavera-otp>
   </div>
 
-  <pre><code set:html={`&lt;script&gt;
+  <Code code={`<script>
   import { register } from "@primavera-ui/components/otp";
   register();
-&lt;/script&gt;
+</script>
 
-&lt;primavera-otp&gt;
-  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
-  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
-  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
-  &lt;span&gt;-&lt;/span&gt;
-  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
-  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
-  &lt;primavera-otp-input&gt;&lt;/primavera-otp-input&gt;
-&lt;/primavera-otp&gt;`} /></pre>
+<primavera-otp>
+  <primavera-otp-input></primavera-otp-input>
+  <primavera-otp-input></primavera-otp-input>
+  <primavera-otp-input></primavera-otp-input>
+  <span>-</span>
+  <primavera-otp-input></primavera-otp-input>
+  <primavera-otp-input></primavera-otp-input>
+  <primavera-otp-input></primavera-otp-input>
+</primavera-otp>`} lang="html" />
 </Layout>
 
 <style is:global>
@@ -105,27 +107,7 @@ import Layout from "../layouts/Layout.astro";
     border-radius: 0 0.5rem 0.5rem 0;
   }
 
-  /* ── switcher ── */
-  .style-switcher {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-  }
 
-  .style-switcher button {
-    padding: 0.25rem 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 0.25rem;
-    background: white;
-    cursor: pointer;
-    font-size: 0.875rem;
-  }
-
-  .style-switcher button.active {
-    background: #3b82f6;
-    color: white;
-    border-color: #3b82f6;
-  }
 
   .demo {
     margin-bottom: 1.5rem;
@@ -146,7 +128,7 @@ import Layout from "../layouts/Layout.astro";
   register();
 
   const demo = document.querySelector(".demo")!;
-  const buttons = document.querySelectorAll<HTMLButtonElement>(".style-switcher button");
+  const buttons = document.querySelectorAll<HTMLButtonElement>(".sidebar button[data-style]");
 
   buttons.forEach((btn) => {
     btn.addEventListener("click", () => {
