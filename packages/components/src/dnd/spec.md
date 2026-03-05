@@ -244,6 +244,39 @@ Custom bindings by consumer should be accounted for in kb interface.
 9. The canvas renders a placeholder directly below the hover space. The calculated position is `hoverIndex * height(listitem) - scrollTop`. When the drag is outside the parent there is no placeholder. When the user is at the bottom of the list, the placeholder y position must be at `items.length * height(listitem)`.
 10. `rounded-select: true` will generate css border-radius within a style block inside the component, around contiguous selection groups, using sibling/next/previous selectors to do so, such that each contiguous selection appears as block with rounded edges. Top & bottom of virtualised window are always at the border even if there's an adjacent selected item, so may be render those edges incorrectly - this is ok because they're out of view.
 
+## Drag overlay
+
+When `drag-type='overlay'`, a full-page overlay captures pointer events and displays a visual stack of the dragged items.
+
+### Markup
+
+```
+<body>
+  ...
+  <!-- appended to body, removed on drag end -->
+  <div style="position:fixed; inset:0; z-index:9999; pointer-events:none">
+
+    <!-- one per drag-stack-count, each wrapping a cloned role="option" -->
+    <div class="dnd-stack-item" style="position:absolute; width:{listWidth}px; height:{itemHeight}px; overflow:hidden; background:{resolvedBg}">
+      <div role="option" ...><!-- cloned content --></div>
+    </div>
+
+    <!-- count badge, only when dragging 2+ items -->
+    <div class="dnd-badge" style="position:absolute">3</div>
+
+  </div>
+</body>
+```
+
+### Style notes
+
+- Each stack item wrapper provides explicit `width` (from list) and `height` (from `itemHeight`) since cloned elements lose their layout context.
+- `overflow:hidden` clips the clone to the wrapper bounds.
+- Background is resolved from the source element's computed style at drag start (CSS vars don't cascade into the body-level overlay).
+- Stack items offset by `[2px, 2px]` per depth with decreasing opacity.
+- `box-shadow` via `var(--dnd-drag-shadow)`.
+- Count badge is a direct child of the overlay (not a stack item) to avoid being clipped. It tracks the first stack item's position in the animation loop, anchored at top-right.
+
 ## Touch devices (differences from mouse drag/select model)
 1. Multi-select is currently not possible on touch devices.
 2. A tap constitutes select one behaviour.

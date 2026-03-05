@@ -9,6 +9,7 @@ export class DndDragOverlay {
   private targetPos = { x: 0, y: 0 };
   private raf: number | null = null;
   private active = false;
+  private listWidth = 0;
 
   constructor(private stackCount: number) {}
 
@@ -31,6 +32,7 @@ export class DndDragOverlay {
   ): void {
     this.active = true;
     this.targetPos = { x: startX, y: startY };
+    this.listWidth = listWidth;
 
     // Create full-page overlay
     this.overlay = document.createElement("div");
@@ -79,13 +81,12 @@ export class DndDragOverlay {
       this.positions.push({ x: startX, y: startY });
     }
 
-    // Count badge
+    // Count badge — appended to overlay directly so it isn't clipped by overflow:hidden
     if (totalCount > 1) {
       this.countBadge = document.createElement("div");
       this.countBadge.textContent = String(totalCount);
       this.countBadge.style.cssText = `
         position:absolute;
-        top:-8px;right:-8px;
         min-width:20px;height:20px;
         border-radius:10px;
         background:#3b82f6;color:#fff;
@@ -94,8 +95,7 @@ export class DndDragOverlay {
         padding:0 5px;
         z-index:${this.stackCount + 1};
       `;
-      this.stackEls[0].style.position = "relative";
-      this.stackEls[0].appendChild(this.countBadge);
+      this.overlay.appendChild(this.countBadge);
     }
 
     this.animate();
@@ -149,6 +149,12 @@ export class DndDragOverlay {
         el.style.left = `${this.positions[i].x + offset}px`;
         el.style.top = `${this.positions[i].y + offset}px`;
       }
+    }
+
+    // Position badge at top-right of first stack element
+    if (this.countBadge && this.positions.length > 0) {
+      this.countBadge.style.left = `${this.positions[0].x + this.listWidth - 8}px`;
+      this.countBadge.style.top = `${this.positions[0].y - 8}px`;
     }
 
     this.raf = requestAnimationFrame(this.animate);
