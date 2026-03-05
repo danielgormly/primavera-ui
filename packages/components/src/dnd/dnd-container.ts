@@ -236,9 +236,11 @@ export class PrimaveraDnd extends HTMLElement {
     if (dragSet) {
       const visualCount = order.filter((k) => !dragSet.has(k)).length;
       const nudgeExtra = this.hoverIndex !== null && this.nudge ? 1 : 0;
-      this.listbox.style.height = `${this.virtualization.getTotalHeight(visualCount + nudgeExtra)}px`;
+      const contentHeight = this.virtualization.getTotalHeight(visualCount + nudgeExtra);
+      this.listbox.style.height = `${Math.max(contentHeight, this.parent.clientHeight)}px`;
     } else {
-      this.listbox.style.height = `${this.virtualization.getTotalHeight(order.length)}px`;
+      const contentHeight = this.virtualization.getTotalHeight(order.length);
+      this.listbox.style.height = `${Math.max(contentHeight, this.parent.clientHeight)}px`;
     }
 
     // Calculate visible range
@@ -272,7 +274,6 @@ export class PrimaveraDnd extends HTMLElement {
       const existing = this.renderedItems.get(key);
 
       if (existing) {
-        // Update position and selection state
         this.updateItemPosition(existing, i);
         this.updateItemSelection(existing, key, i, order, selectedKeys);
       } else {
@@ -694,6 +695,7 @@ export class PrimaveraDnd extends HTMLElement {
 
   private startOverlayDrag(x: number, y: number): void {
     this.isDragging = true;
+    this.listbox.style.overflow = "hidden";
     this.draggedKeys = this.selection.getSelectedKeys();
 
     // Collect rendered elements for the stack
@@ -717,6 +719,19 @@ export class PrimaveraDnd extends HTMLElement {
       grabElement ?? elements[0],
     );
     this.renderList(); // Re-render to hide dragged items
+
+    // Clamp scroll position once to fit collapsed layout
+    const order = this.source!.getOrder();
+    const dragSet = new Set(this.draggedKeys);
+    const visualCount = order.filter((k) => !dragSet.has(k)).length;
+    const listHeight = Math.max(
+      this.virtualization.getTotalHeight(visualCount),
+      this.parent.clientHeight,
+    );
+    const maxScroll = listHeight - this.parent.clientHeight;
+    if (this.parent.scrollTop > maxScroll) {
+      this.parent.scrollTop = Math.max(0, maxScroll);
+    }
   }
 
   private endDrag(): void {
@@ -756,6 +771,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.hoverIndex = null;
     this.lastPointerPos = null;
     this.draggedKeys = [];
+    this.listbox.style.overflow = "";
     this.renderList();
   }
 
@@ -826,6 +842,7 @@ export class PrimaveraDnd extends HTMLElement {
       this.isDragging = false;
       this.hoverIndex = null;
       this.draggedKeys = [];
+      this.listbox.style.overflow = "";
       this.canvas.clear();
       this.renderList();
     }

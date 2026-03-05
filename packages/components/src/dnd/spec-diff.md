@@ -40,6 +40,12 @@ During drag, items are positioned in collapsed space (dragged items removed) whi
 
 **Fix:** bypass virtualization during drag — render all items (dragged ones are hidden anyway). Size the listbox to the collapsed layout: `(nonDragCount + nudgeGap + 2) * itemHeight`. Normal virtualization resumes on drag end. Drag is transient; the cost of rendering a few extra hidden items is negligible compared to maintaining a collapsed virtualization window.
 
+## Listbox overflow during drag
+
+During drag, the listbox height is set to the collapsed layout size. However, absolutely positioned children with high `top` values (from the full order) expand `scrollHeight` beyond the explicit `style.height`, causing a scrollbar to reflect the original full-size list.
+
+**Fix:** set `overflow: hidden` on the listbox at drag start, remove it on drag end. This clips the positioned children so `scrollHeight` respects the set height. The scroll parent still controls scrolling independently.
+
 ## hoverIndex must update on scroll, not just mouse move
 
 `hoverIndex` depends on both the cursor position and `scrollTop`. During autoscroll the mouse is stationary but `scrollTop` changes — if `hoverIndex` is only recalculated in the mouse move handler, the placeholder and nudge go stale. Store the last pointer position and recalculate `hoverIndex` in the scroll handler too.
