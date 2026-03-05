@@ -8,6 +8,10 @@ I am building this because I think good behavioural spec is relatively static wh
 
 Also while coding something like this by hand, it is easy to spend hours venturing into suboptimal paths.
 
+### File Sizes (updated manually)
+dist/otp.js    11.74 kB │ gzip:  3.07 kB
+dist/dnd.js    45.49 kB │ gzip: 10.41 kB
+
 ### Features:
 - Native web components
 - Server Side Rendering
@@ -16,6 +20,7 @@ Also while coding something like this by hand, it is easy to spend hours venturi
 - No Shadow DOM
 - Demo pages
 - Tree-shaking
+- Lightweight
 
 ### Roadmap:
 - Touch controls in dnd list
