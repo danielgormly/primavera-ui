@@ -95,11 +95,10 @@ el.setRenderer(renderer);`} lang="js" />
 
 
 
-  /* DnD item styles */
+  /* DnD item styles (global so overlay clones inherit them) */
   #dnd-demo [role="option"] {
     display: flex;
     align-items: center;
-    padding: 0 0.75rem;
     font-size: 0.875rem;
     cursor: default;
     user-select: none;
@@ -118,25 +117,26 @@ el.setRenderer(renderer);`} lang="js" />
     background: #1e3a5f;
   }
 
-  #dnd-demo .item-row {
+  .item-row {
     display: flex;
     align-items: center;
+    padding: 0 0.75rem;
     gap: 0.5rem;
     width: 100%;
     height: 100%;
   }
 
-  #dnd-demo .item-handle {
+  .item-handle {
     color: #999;
     font-size: 0.75rem;
     flex-shrink: 0;
   }
 
-  #dnd-demo .item-label {
+  .item-label {
     flex: 1;
   }
 
-  #dnd-demo .item-index {
+  .item-index {
     color: #999;
     font-size: 0.75rem;
   }
@@ -179,6 +179,13 @@ el.setRenderer(renderer);`} lang="js" />
 
   type Item = { key: string; label: string };
 
+  const frutas = [
+    "manzana", "plátano", "naranja", "fresa", "sandía",
+    "piña", "mango", "papaya", "kiwi", "pera",
+    "durazno", "cereza", "uva", "melón", "frambuesa",
+    "mora", "arándano", "guayaba", "maracuyá", "coco",
+  ];
+
   // Generate initial items
   let nextId = 1;
   const items: Item[] = [];
@@ -186,7 +193,8 @@ el.setRenderer(renderer);`} lang="js" />
 
   function addItem() {
     const id = String(nextId++);
-    const item: Item = { key: id, label: `Item ${id}` };
+    const label = frutas[(nextId - 2) % frutas.length];
+    const item: Item = { key: id, label };
     items.push(item);
     keyIndex.set(id, item);
   }
