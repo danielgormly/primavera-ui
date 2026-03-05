@@ -390,14 +390,7 @@ export class PrimaveraDnd extends HTMLElement {
       delete item.element.dataset.selLast;
     }
 
-    // Hide dragged items in the list during drag
-    if (this.isDragging && this.dragSet.has(key)) {
-      item.element.style.opacity = "0";
-      item.element.style.pointerEvents = "none";
-    } else {
-      item.element.style.opacity = "";
-      item.element.style.pointerEvents = "";
-    }
+
   }
 
   private rebuildCollapsedOrder(): void {
@@ -751,7 +744,15 @@ export class PrimaveraDnd extends HTMLElement {
       this.listbox.clientWidth,
       grabElement ?? elements[0],
     );
-    this.renderList(); // Re-render to hide dragged items
+    // Remove dragged items from DOM — they're now in the overlay
+    for (const key of this.draggedKeys) {
+      const item = this.renderedItems.get(key);
+      if (item) {
+        item.element.remove();
+        this.renderedItems.delete(key);
+      }
+    }
+    this.renderList();
 
     // Clamp scroll position once to fit collapsed layout
     const visualCount = this.collapsedOrder.length;

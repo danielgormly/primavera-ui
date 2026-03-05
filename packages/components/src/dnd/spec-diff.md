@@ -38,7 +38,9 @@ The canvas placeholder line is drawn at `hoverIndex * itemHeight - scrollTop`. W
 
 During drag, items are positioned in collapsed space (dragged items removed) which doesn't map to their indices in the full order. If virtualization windows based on the full order, items that should be visible in collapsed space may fall outside the range and never render — leaving gaps.
 
-**Fix:** bypass virtualization during drag — render all items (dragged ones are hidden anyway). Size the listbox to the collapsed layout: `(nonDragCount + nudgeGap + 2) * itemHeight`. Normal virtualization resumes on drag end. Drag is transient; the cost of rendering a few extra hidden items is negligible compared to maintaining a collapsed virtualization window.
+**Fix:** at drag start, pre-compute three structures: `dragSet` (Set for O(1) membership), `collapsedOrder` (the full order with dragged keys removed), and `visualIndexMap` (key → index within collapsedOrder). Virtualize against `collapsedOrder.length` during drag — the windowing range, hover index, and nudge offsets all use the collapsed count and the pre-computed map. This keeps all drag operations O(1) per visible item, critical for lists with 1000+ items.
+
+**Do not bypass virtualization during drag.** An earlier approach rendered all items during drag, which is O(n) on every mouse move and scroll event. With the pre-computed collapsed order, normal virtualization works correctly in collapsed space.
 
 ## Listbox overflow during drag
 
@@ -50,11 +52,11 @@ During drag, the listbox height is set to the collapsed layout size. However, ab
 
 `hoverIndex` depends on both the cursor position and `scrollTop`. During autoscroll the mouse is stationary but `scrollTop` changes — if `hoverIndex` is only recalculated in the mouse move handler, the placeholder and nudge go stale. Store the last pointer position and recalculate `hoverIndex` in the scroll handler too.
 
-## Drag end: item re-mount
+## Drag lifecycle: remove dragged items from DOM
 
-During drag, dragged items are hidden (`opacity: 0`, `pointer-events: none`) but remain in the DOM with their **pre-drag** `top` value. Since items have `transition: top 0.15s ease`, restoring visibility after the move op causes a visible flash — the item appears at its old position and animates to the new one.
+Dragged items must be removed from the DOM (and the rendered item cache) at **drag start**, immediately after cloning them for the overlay. Do not keep them in the DOM with `opacity: 0` — this couples them to the render loop and prevents proper virtualization of the collapsed space.
 
-**Fix:** when drag ends, remove dragged items from the DOM (and the rendered item cache) **before** clearing drag state and calling `renderList()`. The render pass then re-mounts them as fresh elements at their correct new position. Fresh mounts have no prior `top` to transition from, so there is no flash. This also avoids fragile transition-suppression hacks (`transition: none` + `requestAnimationFrame` restore) which can interfere with subsequent animations.
+At **drag end**, the render pass re-mounts them as fresh elements at their correct new position. Fresh mounts have no prior `top` to transition from, so there is no flash. This also avoids fragile transition-suppression hacks (`transition: none` + `requestAnimationFrame` restore) which can interfere with subsequent animations.
 
 ## Canvas positioning and sizing
 
