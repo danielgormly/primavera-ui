@@ -18,6 +18,7 @@ Also while coding something like this by hand, it is easy to spend hours venturi
 - Tree-shaking
 
 ### Roadmap:
+- Touch controls in dnd list
 - Show second dnd list in demo
 - Wrappers for front-end frameworks (React, SolidJS, Svelte)
 - Calendar component
