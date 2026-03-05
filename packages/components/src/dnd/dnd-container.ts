@@ -694,9 +694,13 @@ export class PrimaveraDnd extends HTMLElement {
 
     // Collect rendered elements for the stack
     const elements: HTMLElement[] = [];
+    let grabElement: HTMLElement | null = null;
     for (const key of this.draggedKeys) {
       const item = this.renderedItems.get(key);
-      if (item) elements.push(item.element);
+      if (item) {
+        elements.push(item.element);
+        if (key === this.mouseDownKey) grabElement = item.element;
+      }
     }
 
     this.dragOverlay.start(
@@ -706,6 +710,7 @@ export class PrimaveraDnd extends HTMLElement {
       y,
       this.itemHeight,
       this.listbox.clientWidth,
+      grabElement ?? elements[0],
     );
     this.renderList(); // Re-render to hide dragged items
   }

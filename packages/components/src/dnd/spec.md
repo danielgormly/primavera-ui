@@ -276,6 +276,7 @@ When `drag-type='overlay'`, a full-page overlay captures pointer events and disp
 - Stack items offset by `[2px, 2px]` per depth with decreasing opacity.
 - `box-shadow` via `var(--dnd-drag-shadow)`.
 - Count badge is a direct child of the overlay (not a stack item) to avoid being clipped. It tracks the first stack item's position in the animation loop, anchored at top-right.
+- Grab offset: the stack anchors relative to the element that initiated the drag (not the first selected item). Compute `grabOffset = elementRect.topLeft - cursorPosition` at drag start and apply to all position updates.
 
 ## Touch devices (differences from mouse drag/select model)
 1. Multi-select is currently not possible on touch devices.

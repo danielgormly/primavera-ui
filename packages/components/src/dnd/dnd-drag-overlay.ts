@@ -10,6 +10,7 @@ export class DndDragOverlay {
   private raf: number | null = null;
   private active = false;
   private listWidth = 0;
+  private grabOffset = { x: 0, y: 0 };
 
   constructor(private stackCount: number) {}
 
@@ -29,10 +30,16 @@ export class DndDragOverlay {
     startY: number,
     itemHeight: number,
     listWidth: number,
+    grabElement: HTMLElement,
   ): void {
     this.active = true;
-    this.targetPos = { x: startX, y: startY };
     this.listWidth = listWidth;
+
+    // Compute grab offset: distance from cursor to the grabbed element's top-left
+    const rect = grabElement.getBoundingClientRect();
+    this.grabOffset = { x: rect.left - startX, y: rect.top - startY };
+
+    this.targetPos = { x: startX + this.grabOffset.x, y: startY + this.grabOffset.y };
 
     // Create full-page overlay
     this.overlay = document.createElement("div");
@@ -78,7 +85,7 @@ export class DndDragOverlay {
       wrapper.appendChild(clone);
       this.overlay.appendChild(wrapper);
       this.stackEls.push(wrapper);
-      this.positions.push({ x: startX, y: startY });
+      this.positions.push({ x: this.targetPos.x, y: this.targetPos.y });
     }
 
     // Count badge — appended to overlay directly so it isn't clipped by overflow:hidden
@@ -103,7 +110,7 @@ export class DndDragOverlay {
 
   /** Update cursor target position. */
   updatePosition(x: number, y: number): void {
-    this.targetPos = { x, y };
+    this.targetPos = { x: x + this.grabOffset.x, y: y + this.grabOffset.y };
   }
 
   /** Tear down overlay and cancel animation. */

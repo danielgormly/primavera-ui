@@ -2,9 +2,9 @@
 
 Primavera is an experimental, spec-first component library with plain JS web component implementations. Spec is majority handwritten & opinionated. Implementations are vibe-coded based on spec then tested by me & further refined.
 
-Spec is currently relatively informal - markdown files with various shapes. Some implementation details are included or suggested. No automated tests currently.
+Spec is currently relatively informal - markdown files with various shapes. Currently, implementation details specific to web components are defined or suggested. No automated tests currently.
 
-I am building this because while frameworks can offer code reuse and ergonomic patterns, the component's shape must be bent somewhat to the framework and in many cases, the component is deployed in an environment that does not make use of the framework again. I believe detailed specification for human user interfaces is best human assisted & directed and LLMs can provide a sound 98% translation.
+I am building this because I think good behavioural spec is relatively static while model-driven development and target environments changes more frequently. Spec can be adjusted to others' needs without having to understand implementation specifics. Spec can be considered contracts between human & llm. The contract must be comprehensible to humans, led by and first for humans & everything else should be downstream. Eventually it could mature to something enforceable in code & compiled assets.
 
 ### Features:
 - Native web components
@@ -20,4 +20,6 @@ I am building this because while frameworks can offer code reuse and ergonomic p
 - Calendar component
 
 ## Support me
-I am making several open-source thoroughly spec'd components and other open source projects. If you find these useful or want to see more, your support is appreciated https://buymeacoffee.com/danielgormly
+I am making more of these components as well as other open source projects. If you find these useful or want to see more, your support is appreciated
+
+<a href="https://www.buymeacoffee.com/danielgormly" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
