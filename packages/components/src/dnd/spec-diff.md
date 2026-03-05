@@ -23,10 +23,10 @@ This directly divides the mouse Y by item height — no mapping through the orig
 ### Applying nudge offsets
 
 For each non-dragged item with `visualIdx` in `filtered`:
-- If `visualIdx >= hoverIndex`: `top = (visualIdx * itemHeight) + (draggedCount * itemHeight)`
+- If `visualIdx >= hoverIndex`: `top = (visualIdx * itemHeight) + itemHeight`
 - Otherwise: `top = visualIdx * itemHeight`
 
-This shifts all items at or below the hover slot down by exactly the height of the dragged items, opening a gap.
+The gap is always exactly one `itemHeight`, regardless of how many items are being dragged.
 
 ### Placeholder
 

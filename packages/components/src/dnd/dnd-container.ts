@@ -374,7 +374,7 @@ export class PrimaveraDnd extends HTMLElement {
     if (this.hoverIndex === null) return;
     const order = this.source!.getOrder();
     const dragSet = new Set(this.draggedKeys);
-    const nudgeAmount = this.draggedKeys.length * this.itemHeight;
+    const nudgeAmount = this.itemHeight;
 
     for (const [key, item] of this.renderedItems) {
       if (dragSet.has(key)) continue;
