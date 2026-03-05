@@ -6,17 +6,17 @@ Spec is currently relatively informal - markdown files with various shapes. Curr
 
 I am building this because I think good behavioural spec is relatively static while model-driven development and target environments changes more frequently. Spec can be adjusted to others' needs without having to understand implementation specifics. Spec can be considered contracts between human & llm. The contract must be comprehensible to humans, led by and first for humans & everything else should be downstream. Eventually it could mature to something enforceable in code & compiled assets.
 
-Also while coding something like this by hand, it is easy to spend hours venturing into suboptimal paths.
-
 ### NPM
 ```bash
 npm install @primavera-ui/components
 ```
 
 
-### File Sizes (updated manually)
+### Component sizes
+<pre>
 dist/otp.js    11.74 kB │ gzip:  3.07 kB
 dist/dnd.js    45.49 kB │ gzip: 10.41 kB
+</pre>
 
 ### Features:
 - Native web components
