@@ -605,6 +605,13 @@ export class PrimaveraDnd extends HTMLElement {
 
     // Update selection to new positions
     this.selection.updateOrder(this.source.getOrder());
+
+    // Scroll to the leading edge of the moved selection
+    const scrollTarget =
+      dir === "up"
+        ? this.selection.getSelectionTop()
+        : this.selection.getSelectionBottom();
+    if (scrollTarget !== null) this.scrollToKey(scrollTarget);
   }
 
   // ── Mouse ───────────────────────────────────────────────────────
