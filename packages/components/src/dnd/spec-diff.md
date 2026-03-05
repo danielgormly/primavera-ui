@@ -68,3 +68,23 @@ The canvas CSS dimensions are set explicitly via a `ResizeObserver` on the scrol
 ### Placeholder height matches item height
 
 The placeholder is a filled rectangle the full height of one item, not a thin line. The canvas must receive `itemHeight` and draw with `fillRect(0, y, canvasWidth, itemHeight)`. This gives clear visual feedback of the drop slot size.
+
+## Drag overlay: row container styling
+
+The `role="option"` container provides the row's dimensions and positioning within the list, but the consumer's renderer only mounts content *inside* it. When the overlay clones these elements for the drag stack, the clones are removed from the list layout context — they lose their width, and have no background, making them appear as floating unstyled content.
+
+**Fix:** the `role="option"` container should apply baseline visual properties that travel with it when cloned:
+
+- `width: 100%` (already set via `left:0; right:0`)
+- `height: itemHeight` (already set)
+- `background: var(--dnd-row-bg, transparent)` — a CSS custom property the consumer sets to define the row background. Defaults to transparent so it's opt-in.
+
+The component should apply this background directly on the `role="option"` element at mount time. This ensures drag overlay clones inherit a visible background without the renderer needing to know about drag concerns.
+
+### Overlay inherits resolved styles, not CSS vars
+
+The drag overlay is appended to `<body>`, outside the component's DOM subtree. CSS custom properties scoped to the component (e.g. `--dnd-select-bg`) will not cascade into the overlay. At drag start, resolve computed styles (background, etc.) from the source elements and apply them as concrete values on the overlay wrappers.
+
+### CSS custom property convention
+
+All component-level styling hooks use the `--dnd-*` namespace (e.g. `--dnd-row-bg`, `--dnd-drag-shadow`, `--dnd-placeholder-color`). No per-instance namespace segment is needed — consumers can scope overrides to specific instances using standard CSS selectors on any ancestor or the `<primavera-dnd>` element itself.

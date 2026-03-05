@@ -406,11 +406,13 @@ export class PrimaveraDnd extends HTMLElement {
   }
 
   private updateRoundedSelectStyles(): void {
+    const base = `[data-selected] { background: var(--dnd-select-bg, transparent); }`;
     if (!this.roundedSelect) {
-      this.styleEl.textContent = "";
+      this.styleEl.textContent = base;
       return;
     }
     this.styleEl.textContent = `
+      ${base}
       [data-sel-first] { border-top-left-radius: 4px; border-top-right-radius: 4px; }
       [data-sel-last] { border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
     `;
@@ -697,7 +699,14 @@ export class PrimaveraDnd extends HTMLElement {
       if (item) elements.push(item.element);
     }
 
-    this.dragOverlay.start(elements, this.draggedKeys.length, x, y);
+    this.dragOverlay.start(
+      elements,
+      this.draggedKeys.length,
+      x,
+      y,
+      this.itemHeight,
+      this.listbox.clientWidth,
+    );
     this.renderList(); // Re-render to hide dragged items
   }
 
