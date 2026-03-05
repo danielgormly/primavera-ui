@@ -85,6 +85,10 @@ The component should apply this background directly on the `role="option"` eleme
 
 The drag overlay is appended to `<body>`, outside the component's DOM subtree. CSS custom properties scoped to the component (e.g. `--dnd-select-bg`) will not cascade into the overlay. At drag start, resolve computed styles (background, etc.) from the source elements and apply them as concrete values on the overlay wrappers.
 
+## Scroll-to-key animation
+
+The spec calls for smooth scrolling when an off-screen item is selected. Browser-native `scrollTo({ behavior: "smooth" })` is too slow and not tuneable. Use a custom `requestAnimationFrame` lerp instead: each frame, close 35% of the remaining distance (`scrollTop += diff * 0.35`), snapping when `|diff| < 1px`. Cancel any in-flight scroll raf when a new scroll target is set or on disconnect.
+
 ### CSS custom property convention
 
 All component-level styling hooks use the `--dnd-*` namespace (e.g. `--dnd-row-bg`, `--dnd-drag-shadow`, `--dnd-placeholder-color`). No per-instance namespace segment is needed — consumers can scope overrides to specific instances using standard CSS selectors on any ancestor or the `<primavera-dnd>` element itself.

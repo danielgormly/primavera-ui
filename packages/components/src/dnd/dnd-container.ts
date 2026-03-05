@@ -51,6 +51,7 @@ export class PrimaveraDnd extends HTMLElement {
   private mouseDownPos: { x: number; y: number } | null = null;
   private mouseDownKey: Key | null = null;
   private hoverIndex: number | null = null;
+  private scrollRaf: number | null = null;
   private draggedKeys: Key[] = [];
 
   // ── Attribute helpers ───────────────────────────────────────────
@@ -442,8 +443,23 @@ export class PrimaveraDnd extends HTMLElement {
       this.parent.clientHeight,
     );
     if (offset !== null) {
-      this.parent.scrollTo({ top: offset, behavior: "smooth" });
+      this.smoothScrollTo(offset);
     }
+  }
+
+  private smoothScrollTo(target: number): void {
+    if (this.scrollRaf !== null) cancelAnimationFrame(this.scrollRaf);
+    const step = () => {
+      const diff = target - this.parent.scrollTop;
+      if (Math.abs(diff) < 1) {
+        this.parent.scrollTop = target;
+        this.scrollRaf = null;
+        return;
+      }
+      this.parent.scrollTop += diff * 0.35;
+      this.scrollRaf = requestAnimationFrame(step);
+    };
+    this.scrollRaf = requestAnimationFrame(step);
   }
 
   // ── Keyboard ────────────────────────────────────────────────────
@@ -939,6 +955,7 @@ export class PrimaveraDnd extends HTMLElement {
     document.removeEventListener("mouseup", this.onDocMouseUp);
     this.resizeObserver?.disconnect();
     this.autoscroll?.stop();
+    if (this.scrollRaf !== null) cancelAnimationFrame(this.scrollRaf);
     this.dragOverlay?.stop();
     this.touch?.cancel();
     if (this.sourceUnsub) this.sourceUnsub();
