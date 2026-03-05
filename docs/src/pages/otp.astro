@@ -11,6 +11,8 @@ import { Code } from "astro-expressive-code/components";
     <h3>Style</h3>
     <button data-style="seamless" class="active">Seamless</button>
     <button data-style="boxed">Boxed</button>
+    <hr>
+    <button id="reset-btn">Reset</button>
   </div>
 
   <div class="demo" data-style="seamless">
@@ -49,10 +51,10 @@ import { Code } from "astro-expressive-code/components";
   }
 
   primavera-otp-input input {
-    height: 3rem;
-    width: 2.5rem;
+    height: 2.5rem;
+    width: 2rem;
     text-align: center;
-    font-size: 1.25rem;
+    font-size: 1rem;
   }
 
   primavera-otp-input input:focus {
@@ -135,6 +137,12 @@ import { Code } from "astro-expressive-code/components";
       buttons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       demo.setAttribute("data-style", btn.dataset.style!);
+    });
+  });
+
+  document.getElementById("reset-btn")!.addEventListener("click", () => {
+    demo.querySelectorAll<HTMLInputElement>("input").forEach((input) => {
+      input.value = "";
     });
   });
 </script>

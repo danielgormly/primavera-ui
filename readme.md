@@ -22,6 +22,6 @@ Also while coding something like this by hand, it is easy to spend hours venturi
 - Calendar component
 
 ### Support me
-I am improving & making more of these components as well as other open source projects. If you find these useful or want to see more, your support is appreciated
+I am improving & making more of these components as well as other open source projects. If you find these useful or want to see more, your support is appreciated. Please see my other work & posts at [danielgormly.com](https://danielgormly.com).
 
 <a href="https://www.buymeacoffee.com/danielgormly" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 30px !important;width: 108.5px !important;" ></a>

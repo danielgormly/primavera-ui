@@ -12,13 +12,12 @@ import { Code } from "astro-expressive-code/components";
   </div>
 
   <div slot="sidebar">
-    <h3>Actions</h3>
-    <button id="add-btn">Add item</button>
-    <button id="reset-btn">Reset</button>
     <h3>Settings</h3>
     <label>Confine autoscroll <input type="checkbox" class="toggle" id="confine-toggle"></label>
     <label>Items <span id="item-count-display">50</span></label>
     <input type="range" id="item-count" min="0" max="10000" value="50" step="1">
+    <hr>
+    <button id="reset-btn">Reset</button>
   </div>
 
   <h2>Interactions</h2>
@@ -251,15 +250,6 @@ el.setRenderer(renderer);`} lang="js" />
   (el as any).setRenderer(renderer);
 
   // Controls
-  document.getElementById("add-btn")!.addEventListener("click", () => {
-    addItem();
-    const newItem = items[items.length - 1];
-    const txnId = source.apply([{ type: "insert", items: [newItem], beforeKey: null }]);
-    source._commitUI(txnId);
-    source._commitState(txnId);
-    source.syncOrder();
-  });
-
   document.getElementById("confine-toggle")!.addEventListener("change", (e) => {
     const checked = (e.target as HTMLInputElement).checked;
     el.setAttribute("confine-autoscroll", String(checked));

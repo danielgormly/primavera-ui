@@ -124,12 +124,18 @@ const pathname = Astro.url.pathname;
     top: 2rem;
     align-self: flex-start;
     font-size: 0.8125rem;
-    padding: 2em 1em;
+    padding: 1em;
     border-radius: 0.5em;
     box-shadow: 0 0 0 1px color-mix(in oklab, #0000330f, #f0f0f3 25%), 0 12px 60px #00000026, 0 12px 32px -16px #0009321f;
   }
 
   @media (max-width: 768px) {
+    nav {
+      padding: 0.75rem 1rem;
+    }
+    main {
+      padding: 1rem;
+    }
     .sidebar {
       display: none;
     }
@@ -220,6 +226,16 @@ const pathname = Astro.url.pathname;
 
   html[data-theme="dark"] .sidebar button:hover {
     background: #333;
+  }
+
+  .sidebar hr {
+    border: none;
+    border-top: 1px solid #e5e5e5;
+    margin: 1rem 0;
+  }
+
+  html[data-theme="dark"] .sidebar hr {
+    border-top-color: #333;
   }
 
   .sidebar input[type="range"] {
