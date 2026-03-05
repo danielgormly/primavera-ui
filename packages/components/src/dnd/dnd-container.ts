@@ -372,7 +372,6 @@ export class PrimaveraDnd extends HTMLElement {
   }
 
   private applyNudge(): void {
-    if (this.hoverIndex === null) return;
     const order = this.source!.getOrder();
     const dragSet = new Set(this.draggedKeys);
     const nudgeAmount = this.itemHeight;
@@ -390,7 +389,7 @@ export class PrimaveraDnd extends HTMLElement {
       visualIdx--; // 0-based
 
       const baseTop = visualIdx * this.itemHeight;
-      if (visualIdx >= this.hoverIndex) {
+      if (this.hoverIndex !== null && visualIdx >= this.hoverIndex) {
         item.element.style.top = `${baseTop + nudgeAmount}px`;
       } else {
         item.element.style.top = `${baseTop}px`;
