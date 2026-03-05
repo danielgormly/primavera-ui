@@ -33,12 +33,12 @@ jobs:
         run: bun run --cwd packages/components build
 
       - name: Build docs
-        run: bun run --cwd apps/docs build
+        run: bun run --cwd docs build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/docs/dist
+          path: docs/dist
 
   deploy:
     environment:
