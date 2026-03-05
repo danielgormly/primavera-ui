@@ -89,6 +89,8 @@ The drag overlay is appended to `<body>`, outside the component's DOM subtree. C
 
 The spec calls for smooth scrolling when an off-screen item is selected. Browser-native `scrollTo({ behavior: "smooth" })` is too slow and not tuneable. Use a custom `requestAnimationFrame` lerp instead: each frame, close 35% of the remaining distance (`scrollTop += diff * 0.35`), snapping when `|diff| < 1px`. Cancel any in-flight scroll raf when a new scroll target is set or on disconnect.
 
+Worth mentiong that the browser-native scroll is pretty smooth, but not tight enough e.g. doesn't catch up with holding down arrow (could be resolved by jumping further than it needs to).
+
 ### CSS custom property convention
 
 All component-level styling hooks use the `--dnd-*` namespace (e.g. `--dnd-row-bg`, `--dnd-drag-shadow`, `--dnd-placeholder-color`). No per-instance namespace segment is needed — consumers can scope overrides to specific instances using standard CSS selectors on any ancestor or the `<primavera-dnd>` element itself.
