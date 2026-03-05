@@ -12,9 +12,9 @@ export class DndAutoscroll {
   constructor(
     private container: HTMLElement,
     private buffer: number,
-    private confine: boolean,
+    public confine: boolean,
     maxSpeed = 12,
-    accelerationMs = 2000,
+    accelerationMs = 500,
   ) {
     this.maxSpeed = maxSpeed;
     this.accelerationMs = accelerationMs;
@@ -34,21 +34,31 @@ export class DndAutoscroll {
       return;
     }
 
-    // Confine mode: stop if cursor leaves y-bounds entirely
-    if (this.confine && (clientY < rect.top || clientY > rect.bottom)) {
-      this.stop();
-      return;
-    }
-
     const topZone = rect.top + this.buffer;
     const bottomZone = rect.bottom - this.buffer;
 
-    if (clientY < topZone && clientY >= rect.top) {
-      this.startScroll("up");
-    } else if (clientY > bottomZone && clientY <= rect.bottom) {
-      this.startScroll("down");
+    if (this.confine) {
+      // Confine mode: only scroll within container y-bounds
+      if (clientY < rect.top || clientY > rect.bottom) {
+        this.stop();
+        return;
+      }
+      if (clientY < topZone) {
+        this.startScroll("up");
+      } else if (clientY > bottomZone) {
+        this.startScroll("down");
+      } else {
+        this.stop();
+      }
     } else {
-      this.stop();
+      // Unconfined: scroll when in buffer zone OR beyond container edges
+      if (clientY < topZone) {
+        this.startScroll("up");
+      } else if (clientY > bottomZone) {
+        this.startScroll("down");
+      } else {
+        this.stop();
+      }
     }
   }
 
@@ -74,8 +84,8 @@ export class DndAutoscroll {
 
     const elapsed = performance.now() - this.startTime;
     const t = Math.min(elapsed / this.accelerationMs, 1);
-    // Ease-in acceleration curve
-    const speed = this.maxSpeed * t * t;
+    // Start at 20% speed, accelerate to max
+    const speed = this.maxSpeed * (0.2 + 0.8 * t);
     const delta = this.direction === "up" ? -speed : speed;
 
     this.container.scrollTop += delta;

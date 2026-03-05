@@ -30,7 +30,19 @@ The gap is always exactly one `itemHeight`, regardless of how many items are bei
 
 ### Placeholder
 
+**Important:** removing the nudge when the pointer leaves the parent is an *active* reset, not a skip. The render loop must always call the nudge function during drag — when `hoverIndex` is null, it resets all items to base positions. If nudge is only applied conditionally (e.g. `if hoverIndex !== null`), items will stay at their last nudged positions indefinitely.
+
 The canvas placeholder line is drawn at `hoverIndex * itemHeight - scrollTop`. When the pointer leaves the parent, both the placeholder and nudge offsets are removed.
+
+## Virtualization during drag
+
+During drag, items are positioned in collapsed space (dragged items removed) which doesn't map to their indices in the full order. If virtualization windows based on the full order, items that should be visible in collapsed space may fall outside the range and never render — leaving gaps.
+
+**Fix:** bypass virtualization during drag — render all items (dragged ones are hidden anyway). Size the listbox to the collapsed layout: `(nonDragCount + nudgeGap + 2) * itemHeight`. Normal virtualization resumes on drag end. Drag is transient; the cost of rendering a few extra hidden items is negligible compared to maintaining a collapsed virtualization window.
+
+## hoverIndex must update on scroll, not just mouse move
+
+`hoverIndex` depends on both the cursor position and `scrollTop`. During autoscroll the mouse is stationary but `scrollTop` changes — if `hoverIndex` is only recalculated in the mouse move handler, the placeholder and nudge go stale. Store the last pointer position and recalculate `hoverIndex` in the scroll handler too.
 
 ## Drag end: item re-mount
 

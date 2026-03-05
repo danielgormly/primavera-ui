@@ -52,6 +52,7 @@ export class PrimaveraDnd extends HTMLElement {
   private mouseDownKey: Key | null = null;
   private hoverIndex: number | null = null;
   private scrollRaf: number | null = null;
+  private lastPointerPos: { x: number; y: number } | null = null;
   private draggedKeys: Key[] = [];
 
   // ── Attribute helpers ───────────────────────────────────────────
@@ -229,17 +230,23 @@ export class PrimaveraDnd extends HTMLElement {
     const order = this.source.getOrder();
     this.selection.updateOrder(order);
 
-    // Update list height
-    this.listbox.style.height = `${this.virtualization.getTotalHeight(order.length)}px`;
+    // During drag, size the list to the collapsed layout (non-dragged items + nudge gap)
+    // and render all non-dragged items (skip virtualization to avoid windowing mismatches)
+    const dragSet = this.isDragging ? new Set(this.draggedKeys) : null;
+    if (dragSet) {
+      const visualCount = order.filter((k) => !dragSet.has(k)).length;
+      const nudgeExtra = this.hoverIndex !== null && this.nudge ? 1 : 0;
+      this.listbox.style.height = `${this.virtualization.getTotalHeight(visualCount + nudgeExtra)}px`;
+    } else {
+      this.listbox.style.height = `${this.virtualization.getTotalHeight(order.length)}px`;
+    }
 
     // Calculate visible range
     const scrollTop = this.parent.scrollTop;
     const viewportHeight = this.parent.clientHeight;
-    const newRange = this.virtualization.calculateRange(
-      scrollTop,
-      viewportHeight,
-      order.length,
-    );
+    const newRange = dragSet
+      ? { startIndex: 0, endIndex: order.length }
+      : this.virtualization.calculateRange(scrollTop, viewportHeight, order.length);
 
     // Determine which keys should be rendered
     const keysToRender = new Set<Key>();
@@ -274,8 +281,8 @@ export class PrimaveraDnd extends HTMLElement {
       }
     }
 
-    // Apply drag nudge if active
-    if (this.isDragging && this.hoverIndex !== null && this.nudge) {
+    // Apply drag nudge if active (also resets positions when hoverIndex is null)
+    if (this.isDragging && this.nudge) {
       this.applyNudge();
     }
 
@@ -423,9 +430,11 @@ export class PrimaveraDnd extends HTMLElement {
   private onScroll = (): void => {
     this.renderList();
 
-    // Update canvas placeholder during drag
-    if (this.isDragging && this.hoverIndex !== null) {
+    // Recalculate hover index and placeholder during drag (scrollTop changed)
+    if (this.isDragging) {
+      this.updateHoverIndex();
       this.updatePlaceholder();
+      if (this.nudge) this.applyNudge();
     }
   };
 
@@ -661,32 +670,12 @@ export class PrimaveraDnd extends HTMLElement {
     }
 
     // Update drag
+    this.lastPointerPos = { x: e.clientX, y: e.clientY };
     this.dragOverlay.updatePosition(e.clientX, e.clientY);
+    this.autoscroll.confine = this.confineAutoscroll;
     this.autoscroll.update(e.clientX, e.clientY);
 
-    // Calculate hover index
-    const rect = this.parent.getBoundingClientRect();
-    if (
-      e.clientX >= rect.left &&
-      e.clientX <= rect.right &&
-      e.clientY >= rect.top &&
-      e.clientY <= rect.bottom
-    ) {
-      const y = e.clientY - rect.top + this.parent.scrollTop;
-      const order = this.source.getOrder();
-      const dragSet = new Set(this.draggedKeys);
-      const nonDragCount = order.filter((k) => !dragSet.has(k)).length;
-      this.hoverIndex = Math.max(
-        0,
-        Math.min(
-          Math.floor(y / this.itemHeight),
-          nonDragCount,
-        ),
-      );
-    } else {
-      this.hoverIndex = null;
-    }
-
+    this.updateHoverIndex();
     this.updatePlaceholder();
     if (this.nudge) this.applyNudge();
   };
@@ -765,6 +754,7 @@ export class PrimaveraDnd extends HTMLElement {
 
     this.isDragging = false;
     this.hoverIndex = null;
+    this.lastPointerPos = null;
     this.draggedKeys = [];
     this.renderList();
   }
@@ -915,6 +905,32 @@ export class PrimaveraDnd extends HTMLElement {
   };
 
   // ── Placeholder ─────────────────────────────────────────────────
+
+  private updateHoverIndex(): void {
+    if (!this.source || !this.lastPointerPos) return;
+    const rect = this.parent.getBoundingClientRect();
+    const { x, y } = this.lastPointerPos;
+    if (
+      x >= rect.left &&
+      x <= rect.right &&
+      y >= rect.top &&
+      y <= rect.bottom
+    ) {
+      const scrollY = y - rect.top + this.parent.scrollTop;
+      const order = this.source.getOrder();
+      const dragSet = new Set(this.draggedKeys);
+      const nonDragCount = order.filter((k) => !dragSet.has(k)).length;
+      this.hoverIndex = Math.max(
+        0,
+        Math.min(
+          Math.floor(scrollY / this.itemHeight),
+          nonDragCount,
+        ),
+      );
+    } else {
+      this.hoverIndex = null;
+    }
+  }
 
   private updatePlaceholder(): void {
     if (this.hoverIndex === null) {

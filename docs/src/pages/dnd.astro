@@ -7,12 +7,13 @@ import Layout from "../layouts/Layout.astro";
   <p>Virtualized, multi-select drag-and-drop list. Try clicking, shift-clicking, dragging, and using keyboard shortcuts.</p>
 
   <div class="demo">
-    <primavera-dnd id="dnd-demo" item-height="40" drag-type="overlay" autofocus></primavera-dnd>
+    <primavera-dnd id="dnd-demo" item-height="40" drag-type="overlay" confine-autoscroll="false" autofocus></primavera-dnd>
   </div>
 
   <div class="controls">
     <button id="add-btn">Add item</button>
     <button id="reset-btn">Reset</button>
+    <label><input type="checkbox" id="confine-toggle"> Confine autoscroll</label>
   </div>
 
   <h2>Interactions</h2>
@@ -279,6 +280,11 @@ el.setRenderer(renderer);`} /></pre>
     source._commitUI(txnId);
     source._commitState(txnId);
     source.syncOrder();
+  });
+
+  document.getElementById("confine-toggle")!.addEventListener("change", (e) => {
+    const checked = (e.target as HTMLInputElement).checked;
+    el.setAttribute("confine-autoscroll", String(checked));
   });
 
   document.getElementById("reset-btn")!.addEventListener("click", () => {
