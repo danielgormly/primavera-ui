@@ -54,6 +54,9 @@ export class PrimaveraDnd extends HTMLElement {
   private scrollRaf: number | null = null;
   private lastPointerPos: { x: number; y: number } | null = null;
   private draggedKeys: Key[] = [];
+  private dragSet: Set<Key> = new Set();
+  private collapsedOrder: Key[] = [];
+  private visualIndexMap = new Map<Key, number>();
 
   // ── Attribute helpers ───────────────────────────────────────────
 
@@ -230,64 +233,82 @@ export class PrimaveraDnd extends HTMLElement {
     const order = this.source.getOrder();
     this.selection.updateOrder(order);
 
-    // During drag, size the list to the collapsed layout (non-dragged items + nudge gap)
-    // and render all non-dragged items (skip virtualization to avoid windowing mismatches)
-    const dragSet = this.isDragging ? new Set(this.draggedKeys) : null;
-    if (dragSet) {
-      const visualCount = order.filter((k) => !dragSet.has(k)).length;
+    const scrollTop = this.parent.scrollTop;
+    const viewportHeight = this.parent.clientHeight;
+    const selectedKeys = new Set(this.selection.getSelectedKeys());
+
+    if (this.isDragging) {
+      // Use pre-computed collapsed order for virtualization during drag
+      const visualCount = this.collapsedOrder.length;
       const nudgeExtra = this.hoverIndex !== null && this.nudge ? 1 : 0;
       const contentHeight = this.virtualization.getTotalHeight(visualCount + nudgeExtra);
       this.listbox.style.height = `${Math.max(contentHeight, this.parent.clientHeight)}px`;
+
+      const newRange = this.virtualization.calculateRange(scrollTop, viewportHeight, visualCount);
+
+      const keysToRender = new Set<Key>();
+      for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
+        if (i < visualCount) keysToRender.add(this.collapsedOrder[i]);
+      }
+
+      // Remove items no longer in range (keep dragged items cached)
+      for (const [key, item] of this.renderedItems) {
+        if (!keysToRender.has(key) && !this.dragSet.has(key)) {
+          item.cleanup();
+          item.element.remove();
+          this.renderedItems.delete(key);
+        }
+      }
+
+      // Add/update visible collapsed items
+      for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
+        if (i >= visualCount) break;
+        const key = this.collapsedOrder[i];
+        const fullIndex = order.indexOf(key);
+        const existing = this.renderedItems.get(key);
+        if (existing) {
+          this.updateItemPosition(existing, i);
+          this.updateItemSelection(existing, key, fullIndex, order, selectedKeys);
+        } else {
+          this.mountItem(key, i, order, selectedKeys);
+        }
+      }
+
+      if (this.nudge) this.applyNudge();
+      this.currentRange = newRange;
     } else {
       const contentHeight = this.virtualization.getTotalHeight(order.length);
       this.listbox.style.height = `${Math.max(contentHeight, this.parent.clientHeight)}px`;
-    }
 
-    // Calculate visible range
-    const scrollTop = this.parent.scrollTop;
-    const viewportHeight = this.parent.clientHeight;
-    const newRange = dragSet
-      ? { startIndex: 0, endIndex: order.length }
-      : this.virtualization.calculateRange(scrollTop, viewportHeight, order.length);
+      const newRange = this.virtualization.calculateRange(scrollTop, viewportHeight, order.length);
 
-    // Determine which keys should be rendered
-    const keysToRender = new Set<Key>();
-    for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
-      if (i < order.length) keysToRender.add(order[i]);
-    }
-
-    // Remove items no longer in range (but keep dragged items cached)
-    for (const [key, item] of this.renderedItems) {
-      if (!keysToRender.has(key) && !this.draggedKeys.includes(key)) {
-        item.cleanup();
-        item.element.remove();
-        this.renderedItems.delete(key);
+      const keysToRender = new Set<Key>();
+      for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
+        if (i < order.length) keysToRender.add(order[i]);
       }
-    }
 
-    // Add/update items in range
-    const selectedKeys = new Set(this.selection.getSelectedKeys());
-
-    for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
-      if (i >= order.length) break;
-      const key = order[i];
-      const existing = this.renderedItems.get(key);
-
-      if (existing) {
-        this.updateItemPosition(existing, i);
-        this.updateItemSelection(existing, key, i, order, selectedKeys);
-      } else {
-        // Mount new item
-        this.mountItem(key, i, order, selectedKeys);
+      for (const [key, item] of this.renderedItems) {
+        if (!keysToRender.has(key)) {
+          item.cleanup();
+          item.element.remove();
+          this.renderedItems.delete(key);
+        }
       }
-    }
 
-    // Apply drag nudge if active (also resets positions when hoverIndex is null)
-    if (this.isDragging && this.nudge) {
-      this.applyNudge();
-    }
+      for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
+        if (i >= order.length) break;
+        const key = order[i];
+        const existing = this.renderedItems.get(key);
+        if (existing) {
+          this.updateItemPosition(existing, i);
+          this.updateItemSelection(existing, key, i, order, selectedKeys);
+        } else {
+          this.mountItem(key, i, order, selectedKeys);
+        }
+      }
 
-    this.currentRange = newRange;
+      this.currentRange = newRange;
+    }
   }
 
   private mountItem(
@@ -370,7 +391,7 @@ export class PrimaveraDnd extends HTMLElement {
     }
 
     // Hide dragged items in the list during drag
-    if (this.isDragging && this.draggedKeys.includes(key)) {
+    if (this.isDragging && this.dragSet.has(key)) {
       item.element.style.opacity = "0";
       item.element.style.pointerEvents = "none";
     } else {
@@ -379,23 +400,24 @@ export class PrimaveraDnd extends HTMLElement {
     }
   }
 
-  private applyNudge(): void {
+  private rebuildCollapsedOrder(): void {
     const order = this.source!.getOrder();
-    const dragSet = new Set(this.draggedKeys);
-    const nudgeAmount = this.itemHeight;
-
-    for (const [key, item] of this.renderedItems) {
-      if (dragSet.has(key)) continue;
-      const idx = order.indexOf(key);
-      if (idx === -1) continue;
-
-      // Count how many non-dragged items are before this index
-      let visualIdx = 0;
-      for (let i = 0; i < order.length && i <= idx; i++) {
-        if (!dragSet.has(order[i])) visualIdx++;
+    this.collapsedOrder = [];
+    this.visualIndexMap.clear();
+    for (const key of order) {
+      if (!this.dragSet.has(key)) {
+        this.visualIndexMap.set(key, this.collapsedOrder.length);
+        this.collapsedOrder.push(key);
       }
-      visualIdx--; // 0-based
+    }
+  }
 
+  private applyNudge(): void {
+    const nudgeAmount = this.itemHeight;
+    for (const [key, item] of this.renderedItems) {
+      if (this.dragSet.has(key)) continue;
+      const visualIdx = this.visualIndexMap.get(key);
+      if (visualIdx === undefined) continue;
       const baseTop = visualIdx * this.itemHeight;
       if (this.hoverIndex !== null && visualIdx >= this.hoverIndex) {
         item.element.style.top = `${baseTop + nudgeAmount}px`;
@@ -404,7 +426,6 @@ export class PrimaveraDnd extends HTMLElement {
       }
     }
   }
-
   private clearAllItems(): void {
     for (const [, item] of this.renderedItems) {
       item.cleanup();
@@ -707,6 +728,8 @@ export class PrimaveraDnd extends HTMLElement {
     this.isDragging = true;
     this.listbox.style.overflow = "hidden";
     this.draggedKeys = this.selection.getSelectedKeys();
+    this.dragSet = new Set(this.draggedKeys);
+    this.rebuildCollapsedOrder();
 
     // Collect rendered elements for the stack
     const elements: HTMLElement[] = [];
@@ -731,9 +754,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.renderList(); // Re-render to hide dragged items
 
     // Clamp scroll position once to fit collapsed layout
-    const order = this.source!.getOrder();
-    const dragSet = new Set(this.draggedKeys);
-    const visualCount = order.filter((k) => !dragSet.has(k)).length;
+    const visualCount = this.collapsedOrder.length;
     const listHeight = Math.max(
       this.virtualization.getTotalHeight(visualCount),
       this.parent.clientHeight,
@@ -751,12 +772,9 @@ export class PrimaveraDnd extends HTMLElement {
 
     if (this.hoverIndex !== null && this.source) {
       // Compute the beforeKey from hoverIndex
-      const order = this.source.getOrder();
-      const dragSet = new Set(this.draggedKeys);
-      const filtered = order.filter((k) => !dragSet.has(k));
       const beforeKey =
-        this.hoverIndex < filtered.length
-          ? filtered[this.hoverIndex]
+        this.hoverIndex < this.collapsedOrder.length
+          ? this.collapsedOrder[this.hoverIndex]
           : null;
 
       const txnId = this.source.apply([
@@ -781,6 +799,9 @@ export class PrimaveraDnd extends HTMLElement {
     this.hoverIndex = null;
     this.lastPointerPos = null;
     this.draggedKeys = [];
+    this.dragSet.clear();
+    this.collapsedOrder = [];
+    this.visualIndexMap.clear();
     this.listbox.style.overflow = "";
     this.renderList();
   }
@@ -797,6 +818,8 @@ export class PrimaveraDnd extends HTMLElement {
 
     this.isDragging = true;
     this.draggedKeys = this.selection.getSelectedKeys();
+    this.dragSet = new Set(this.draggedKeys);
+    this.rebuildCollapsedOrder();
 
     if (!this.dragNative) {
       this.dragNative = new DndDragNative(this.renderer);
@@ -852,6 +875,9 @@ export class PrimaveraDnd extends HTMLElement {
       this.isDragging = false;
       this.hoverIndex = null;
       this.draggedKeys = [];
+      this.dragSet.clear();
+      this.collapsedOrder = [];
+      this.visualIndexMap.clear();
       this.listbox.style.overflow = "";
       this.canvas.clear();
       this.renderList();
@@ -944,9 +970,7 @@ export class PrimaveraDnd extends HTMLElement {
       y <= rect.bottom
     ) {
       const scrollY = y - rect.top + this.parent.scrollTop;
-      const order = this.source.getOrder();
-      const dragSet = new Set(this.draggedKeys);
-      const nonDragCount = order.filter((k) => !dragSet.has(k)).length;
+      const nonDragCount = this.collapsedOrder.length;
       this.hoverIndex = Math.max(
         0,
         Math.min(
