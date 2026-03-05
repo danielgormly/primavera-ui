@@ -342,7 +342,11 @@ export class PrimaveraOtp extends HTMLElement {
   // ── helpers ────────────────────────────────────────────────────────
 
   private focusedIndex(): number {
-    const active = document.activeElement;
+    // Walk activeElement chain through shadow roots
+    let active: Element | null = document.activeElement;
+    while (active?.shadowRoot?.activeElement) {
+      active = active.shadowRoot.activeElement;
+    }
     for (let i = 0; i < this.inputs.length; i++) {
       if (this.inputs[i].input === active) return i;
     }

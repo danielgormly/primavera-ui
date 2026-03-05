@@ -73,3 +73,4 @@ Semantic Action | macOS | Windows/Linux |
 ## Implementation Notes
 
 1. OTPInputs must NOT use `maxlength` on the underlying `<input>`. OS-level autofill (iOS SMS codes, macOS Safari) fills the entire code into a single input; `maxlength="1"` causes the browser to truncate before the `input` event fires. Instead, omit `maxlength` and handle multi-character input values in the container — when `input.value.length > 1`, distribute characters across slots as if pasted.
+2. When hosted inside a Shadow DOM (e.g. a Lit or other Web Component), `document.activeElement` stops at the shadow host boundary. To resolve the actually focused input, walk the `shadowRoot.activeElement` chain until no deeper shadow root exists.
