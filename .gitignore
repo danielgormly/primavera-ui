@@ -3,3 +3,5 @@ dist
 .astro
 .playwright-mcp
 .claude
+.DS_Store
+**/*.DS_Store
