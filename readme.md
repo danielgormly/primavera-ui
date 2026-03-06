@@ -37,4 +37,4 @@ dist/dnd.js    45.49 kB │ gzip: 10.41 kB
 ### Support me
 I am improving & making more of these components as well as other open source projects. If you find these useful or want to see more, your support is appreciated. Please see my other work & posts at [danielgormly.com](https://danielgormly.com).
 
-<a href="https://www.buymeacoffee.com/danielgormly" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 30px !important;width: 108.5px !important;" ></a>
+<a href='https://ko-fi.com/V7V51VH89Y' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi1.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
