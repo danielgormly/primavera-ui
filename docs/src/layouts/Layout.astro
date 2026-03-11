@@ -40,7 +40,8 @@ const pathname = Astro.url.pathname;
       <a href={`${import.meta.env.BASE_URL}/`} class:list={["nav-link", { active: pathname === `${import.meta.env.BASE_URL}/` }]}>Readme</a>
       <a href={`${import.meta.env.BASE_URL}/otp`} class:list={["nav-link", { active: pathname.startsWith(`${import.meta.env.BASE_URL}/otp`) }]}>OTP</a>
       <a href={`${import.meta.env.BASE_URL}/dnd`} class:list={["nav-link", { active: pathname.startsWith(`${import.meta.env.BASE_URL}/dnd`) }]}>DnD</a>
-      <a href="https://github.com/danielgormly/primavera-ui" class="nav-link github-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository">GitHub</a>
+      <div class="nav-link push-right">v0.0.1</div>
+      <a href="https://github.com/danielgormly/primavera-ui" class="nav-link" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository">GitHub</a>
       <button id="theme-toggle" aria-label="Toggle theme"></button>
     </nav>
     <main>
@@ -94,7 +95,7 @@ const pathname = Astro.url.pathname;
     margin-right: 1rem;
   }
 
-  .github-link {
+  .push-right {
     margin-left: auto;
   }
   #theme-toggle {
