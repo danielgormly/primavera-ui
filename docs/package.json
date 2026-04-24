@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "astro dev",
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
+    "start": "bun --bun x astro dev",
+    "dev": "bun --bun x astro dev",
+    "build": "bun --bun x astro build",
+    "preview": "bun --bun x astro preview"
   },
   "dependencies": {
     "@primavera-ui/components": "workspace:*",

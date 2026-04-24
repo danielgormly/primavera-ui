@@ -22,10 +22,10 @@
     }
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build && tsc --emitDeclarationOnly",
-    "watch": "vite build --watch",
-    "preview": "vite preview"
+    "dev": "bun --bun x vite",
+    "build": "bun --bun x vite build && bun --bun x tsc --emitDeclarationOnly",
+    "watch": "bun --bun x vite build --watch",
+    "preview": "bun --bun x vite preview"
   },
   "dependencies": {
     "@flatten-js/interval-tree": "^2.0.3"
