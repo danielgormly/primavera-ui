@@ -15,6 +15,10 @@
     "./dnd": {
       "types": "./dist/dnd/index.d.ts",
       "import": "./dist/dnd.js"
+    },
+    "./cal": {
+      "types": "./dist/cal/index.d.ts",
+      "import": "./dist/cal.js"
     }
   },
   "scripts": {
@@ -22,6 +26,9 @@
     "build": "vite build && tsc --emitDeclarationOnly",
     "watch": "vite build --watch",
     "preview": "vite preview"
+  },
+  "dependencies": {
+    "@flatten-js/interval-tree": "^2.0.3"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

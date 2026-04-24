@@ -1,5 +1,5 @@
 import { Accessor, createEffect, onCleanup, onMount, Signal } from "solid-js";
-import { AirdayCal } from "./cal";
+import { PrimaveraCal } from "./cal";
 import { CalendarEvent } from "./model";
 import { EventDB } from "./state";
 import { Theme } from "./colours";
@@ -9,19 +9,19 @@ interface CalendarProps {
   theme: Accessor<Theme>;
   parentElement: HTMLElement;
   db?: EventDB;
-  cal?: AirdayCal;
+  cal?: PrimaveraCal;
   stats?: Stats;
 }
 
 export function CalSolidWrapper(props: CalendarProps) {
   let domContainer: HTMLDivElement | undefined;
-  let cal: AirdayCal;
+  let cal: PrimaveraCal;
   if (props.cal && props.db) {
     console.warn("CalSolidWrapper ignoring props.db as cal is provided");
   }
   if (!props.cal) {
     if (!props.db) throw new Error("DB must be provided if cal not provided");
-    cal = new AirdayCal(props.db);
+    cal = new PrimaveraCal(props.db);
   } else {
     cal = props.cal;
   }

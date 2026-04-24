@@ -1,0 +1,222 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { Code } from "astro-expressive-code/components";
+---
+
+<Layout title="Calendar">
+  <h1>Calendar</h1>
+  <p>DOM-backed vanilla JS calendar. Weekly view with virtualised events, all-day rendering, and hour-grid time column. See <a href="https://github.com/danielgormly/primavera-ui/blob/main/packages/components/src/cal/readme.md">readme</a>. WIP — not for use yet.</p>
+
+  <div class="demo">
+    <div id="cal-demo"></div>
+  </div>
+
+  <div slot="sidebar">
+    <h3>Settings</h3>
+    <label>Days visible <span id="days-visible-display">14</span></label>
+    <input type="range" id="days-visible" min="1" max="28" value="14" step="1">
+    <label>Timed events <span id="timed-count-display">500</span></label>
+    <input type="range" id="timed-count" min="0" max="5000" value="500" step="50">
+    <label>All-day events <span id="all-day-count-display">50</span></label>
+    <input type="range" id="all-day-count" min="0" max="500" value="50" step="10">
+    <hr>
+    <button id="today-btn">Jump to today</button>
+    <button id="reset-btn">Reset</button>
+  </div>
+
+  <h2>Usage</h2>
+  <Code code={`import { PrimaveraCal, EventDB } from "@primavera-ui/components/cal";
+
+const db = new EventDB();
+db.loadEvents([
+  {
+    id: "1",
+    title: "Team standup",
+    start: new Date("2026-04-27T09:00:00"),
+    end: new Date("2026-04-27T09:30:00"),
+    allDay: false,
+    color: "blue",
+  },
+]);
+db.ready = true;
+
+const cal = new PrimaveraCal(db);
+cal.mount(document.getElementById("cal-demo"));`} lang="js" />
+</Layout>
+
+<style is:global>
+  p {
+    color: #444;
+    line-height: 1.6;
+    max-width: 40rem;
+  }
+
+  html[data-theme="dark"] p {
+    color: #aaa;
+  }
+
+  .demo {
+    margin-bottom: 1rem;
+    border: 1px solid #e5e5e5;
+    border-radius: 0.5rem;
+    height: 600px;
+    overflow: hidden;
+  }
+
+  html[data-theme="dark"] .demo {
+    border-color: #333;
+  }
+
+  #cal-demo {
+    width: 100%;
+    height: 100%;
+  }
+</style>
+
+<script>
+  import { PrimaveraCal, EventDB, type CalendarEventConstructorProps } from "@primavera-ui/components/cal";
+
+  const titles = [
+    "Team standup",
+    "1:1 with Morgan",
+    "Design review",
+    "Lunch",
+    "Deep work",
+    "Customer call",
+    "Sprint planning",
+    "Release cut",
+  ];
+
+  const allDayTitles = ["Conference", "Holiday", "Offsite", "Vacation", "On-call"];
+
+  const colors = ["blue", "yellow"];
+
+  function pick<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  let nextId = 0;
+  const iterId = () => (nextId++).toString();
+
+  function utcMidnight(d: Date) {
+    const out = new Date(d);
+    out.setUTCHours(0, 0, 0, 0);
+    return out;
+  }
+
+  function generateTimedEvents(n: number, spanDays: number) {
+    const events: CalendarEventConstructorProps[] = [];
+    const start = new Date();
+    start.setDate(start.getDate() - Math.floor(spanDays / 2));
+    start.setHours(0, 0, 0, 0);
+    const rangeMs = spanDays * 864e5;
+    const durations = [15, 30, 60, 90, 120];
+    for (let i = 0; i < n; i++) {
+      const offset = Math.floor(Math.random() * rangeMs);
+      const snapped = offset - (offset % (15 * 60 * 1000));
+      const startDate = new Date(start.valueOf() + snapped);
+      const duration = pick(durations) * 60 * 1000;
+      events.push({
+        id: iterId(),
+        title: pick(titles),
+        start: startDate,
+        end: new Date(startDate.valueOf() + duration),
+        allDay: false,
+        color: pick(colors),
+      });
+    }
+    return events;
+  }
+
+  function generateAllDayEvents(n: number, spanDays: number) {
+    const events: CalendarEventConstructorProps[] = [];
+    const start = utcMidnight(new Date());
+    start.setUTCDate(start.getUTCDate() - Math.floor(spanDays / 2));
+    for (let i = 0; i < n; i++) {
+      const dayOffset = Math.floor(Math.random() * spanDays);
+      const startDate = new Date(start.valueOf() + dayOffset * 864e5);
+      const dayLen = 1 + Math.floor(Math.random() * 3);
+      events.push({
+        id: iterId(),
+        title: pick(allDayTitles),
+        start: startDate,
+        end: new Date(startDate.valueOf() + dayLen * 864e5),
+        allDay: true,
+        color: pick(colors),
+      });
+    }
+    return events;
+  }
+
+  const container = document.getElementById("cal-demo") as HTMLDivElement;
+
+  let cal: PrimaveraCal;
+
+  function buildCal(timedCount: number, allDayCount: number, daysVisible: number) {
+    container.innerHTML = "";
+    nextId = 0;
+    const db = new EventDB();
+    db.loadEvents(generateTimedEvents(timedCount, 365 * 2));
+    db.loadEvents(generateAllDayEvents(allDayCount, 365 * 2));
+    db.ready = true;
+    cal = new PrimaveraCal(db);
+    cal.mount(container);
+    cal.changeTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
+    if (daysVisible !== 14) cal.setDaysVisible(daysVisible);
+  }
+
+  const daysVisibleSlider = document.getElementById("days-visible") as HTMLInputElement;
+  const daysVisibleDisplay = document.getElementById("days-visible-display")!;
+  const timedCountSlider = document.getElementById("timed-count") as HTMLInputElement;
+  const timedCountDisplay = document.getElementById("timed-count-display")!;
+  const allDayCountSlider = document.getElementById("all-day-count") as HTMLInputElement;
+  const allDayCountDisplay = document.getElementById("all-day-count-display")!;
+
+  buildCal(Number(timedCountSlider.value), Number(allDayCountSlider.value), Number(daysVisibleSlider.value));
+
+  daysVisibleSlider.addEventListener("input", () => {
+    daysVisibleDisplay.textContent = daysVisibleSlider.value;
+    cal.setDaysVisible(Number(daysVisibleSlider.value));
+  });
+
+  let rebuildTimer: ReturnType<typeof setTimeout>;
+  function scheduleRebuild() {
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(() => {
+      buildCal(
+        Number(timedCountSlider.value),
+        Number(allDayCountSlider.value),
+        Number(daysVisibleSlider.value),
+      );
+    }, 250);
+  }
+
+  timedCountSlider.addEventListener("input", () => {
+    timedCountDisplay.textContent = timedCountSlider.value;
+    scheduleRebuild();
+  });
+
+  allDayCountSlider.addEventListener("input", () => {
+    allDayCountDisplay.textContent = allDayCountSlider.value;
+    scheduleRebuild();
+  });
+
+  document.getElementById("today-btn")!.addEventListener("click", () => {
+    cal.scrollTo(new Date());
+  });
+
+  document.getElementById("reset-btn")!.addEventListener("click", () => {
+    daysVisibleSlider.value = "14";
+    timedCountSlider.value = "500";
+    allDayCountSlider.value = "50";
+    daysVisibleDisplay.textContent = "14";
+    timedCountDisplay.textContent = "500";
+    allDayCountDisplay.textContent = "50";
+    buildCal(500, 50, 14);
+  });
+
+  const observer = new MutationObserver(() => {
+    cal.changeTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
+  });
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>

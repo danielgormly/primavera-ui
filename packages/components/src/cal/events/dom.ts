@@ -1,4 +1,4 @@
-import { AirdayCal } from "../cal";
+import { PrimaveraCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { getDateUTC, getTime, isTodayUTC, isWeekend } from "../time";
 import { AllDayEvents } from "./all-day";
@@ -27,7 +27,7 @@ function EventEl(layout: EventLayout, event: CalendarEvent) {
   return div;
 }
 
-export function GridLines(airdayCal: AirdayCal) {
+export function GridLines(cal: PrimaveraCal) {
   const gridlines = document.createElement("div");
   gridlines.className = "time-gridlines";
   let pxOffset = 0;
@@ -39,7 +39,7 @@ export function GridLines(airdayCal: AirdayCal) {
       hz.style.top = `${pxOffset}px`;
       gridlines.appendChild(hz);
     }
-    pxOffset += airdayCal.transform.hourPx;
+    pxOffset += cal.transform.hourPx;
   }
   return gridlines;
 }
@@ -51,7 +51,7 @@ export function GridLines(airdayCal: AirdayCal) {
 //   return debugLabel;
 // }
 
-export function DayEl(airday: AirdayCal, date: number, xPos: number) {
+export function DayEl(cal: PrimaveraCal, date: number, xPos: number) {
   const jsDate = new Date(date);
   const weekend = isWeekend(jsDate);
   // Setup theme
@@ -59,14 +59,14 @@ export function DayEl(airday: AirdayCal, date: number, xPos: number) {
   dayEl.className = "day";
   dayEl.setAttribute("data-date", date.toString());
   dayEl.style.transform = `translate(${xPos}px)`;
-  dayEl.style.width = `${airday.transform.dayPx}px`;
+  dayEl.style.width = `${cal.transform.dayPx}px`;
   if (weekend) dayEl.classList.add("weekend");
   // Event container
   const dayEventsEl = document.createElement("div");
   dayEventsEl.className = "day-events";
   dayEl.appendChild(dayEventsEl);
   // GridLines
-  const gridLines = GridLines(airday);
+  const gridLines = GridLines(cal);
   dayEl.appendChild(gridLines);
   return dayEl;
 }
@@ -86,11 +86,11 @@ export function EventsContainer() {
   return container;
 }
 
-export function CalHeaderCol(airday: AirdayCal, date: number, xPos: number) {
+export function CalHeaderCol(cal: PrimaveraCal, date: number, xPos: number) {
   const jsDate = new Date(date);
   const weekend = isWeekend(jsDate); // TODO: Consider pulling this up to renderer controller
   const col = document.createElement("div");
-  col.style.width = `${airday.transform.dayPx}px`;
+  col.style.width = `${cal.transform.dayPx}px`;
   col.className = "cal-header-col";
   if (weekend) col.classList.add("weekend");
   if (isTodayUTC(jsDate)) {
@@ -151,29 +151,29 @@ export function AnchorEl() {
   return anchor;
 }
 
-export function TimesEl(airdayCal: AirdayCal) {
+export function TimesEl(cal: PrimaveraCal) {
   const labels = document.createElement("div");
   labels.className = "time-label-col";
 
   let pxOffset = 0;
   const now = new Date();
-  const y = airdayCal.transform.timeToY(now);
+  const y = cal.transform.timeToY(now);
 
   for (let i = 0; i <= 24; i++) {
     if (i >= 1 && i <= 24) {
-      if (Math.abs(pxOffset - y) < airdayCal.TIME_FONT_SIZE) {
+      if (Math.abs(pxOffset - y) < cal.TIME_FONT_SIZE) {
         // Hides time if obscured by current hour
         // TODO: This needs to be updated at least ever
       } else {
         const label = document.createElement("div");
         label.className = "time-grid-label";
         label.textContent = `${i.toString().padStart(2, "0")}:00`;
-        label.style.right = `${airdayCal.transform.margin}px`;
+        label.style.right = `${cal.transform.margin}px`;
         label.style.top = `${pxOffset}px`;
         labels.appendChild(label);
       }
     }
-    pxOffset += airdayCal.transform.hourPx;
+    pxOffset += cal.transform.hourPx;
   }
   return labels;
 }
@@ -182,11 +182,11 @@ export function TimesEl(airdayCal: AirdayCal) {
 // TODO: Don't update unless time actually changes
 // - might be better to use set interval instead of updating on tick
 export class NowMarker {
-  airday: AirdayCal;
+  cal: PrimaveraCal;
   label: HTMLDivElement;
   marker: HTMLDivElement;
-  constructor(airday: AirdayCal) {
-    this.airday = airday;
+  constructor(cal: PrimaveraCal) {
+    this.cal = cal;
     const label = document.createElement("div");
     label.className = "now-label";
     this.label = label;
@@ -199,7 +199,7 @@ export class NowMarker {
   update() {
     const now = new Date();
     this.label.innerText = getTime(now.valueOf());
-    const y = this.airday.transform.timeToY(now);
+    const y = this.cal.transform.timeToY(now);
     this.label.style.top = `${y}px`; // TODO: 50 is dynamic
     this.marker.style.top = `${y}px`; // TODO: 50 is dynamic
   }

@@ -1,6 +1,9 @@
 {
   "name": "primavera-ui",
   "private": true,
+  "scripts": {
+    "start": "cd docs && bun run dev"
+  },
   "workspaces": [
     "packages/*",
     "docs"

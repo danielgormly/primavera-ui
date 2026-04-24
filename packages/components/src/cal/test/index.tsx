@@ -1,7 +1,7 @@
 /* @refresh reload */
 import "./index.css";
 import {
-  AirdayCal,
+  PrimaveraCal,
   CalendarEventConstructorProps,
   EventDB,
 } from "../src/index";
@@ -72,6 +72,6 @@ const db = new EventDB();
 db.loadEvents(events);
 db.loadEvents(events24hrs);
 db.ready = true;
-const cal = new AirdayCal(db);
+const cal = new PrimaveraCal(db);
 
 cal.mount(domContainer);

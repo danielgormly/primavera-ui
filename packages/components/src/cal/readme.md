@@ -1,6 +1,6 @@
 ## @primavera-ui
 
-Calendar ported from Airday - DOM backed vanilla JS. Currently monthly view only.
+DOM-backed vanilla JS calendar. Currently monthly view only.
 
 - consider adding back stats-js
 

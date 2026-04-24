@@ -12,5 +12,12 @@
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/cal/test",
+    "src/cal/solid.tsx",
+    "src/cal/time.spec.ts",
+    "src/cal/vite.config.ts",
+    "src/cal/vite.build.ts"
+  ]
 }

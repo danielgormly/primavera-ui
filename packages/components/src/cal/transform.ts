@@ -1,11 +1,11 @@
-import { AirdayCal } from "./cal";
+import { PrimaveraCal } from "./cal";
 import { getStartOfWeekUTC, getDateArray, DayRange, utcMidnight } from "./time";
 
 const startOfWeekUTC = getStartOfWeekUTC(new Date());
 
 // Clipspace and day/time to x/y transform concerns
 export class CalendarTransform {
-  airdayCal: AirdayCal;
+  cal: PrimaveraCal;
   // Start dimensions
   hourPx = 50; // 1 hour grid height
   dayPx = 100; // 1 day grid width
@@ -25,8 +25,8 @@ export class CalendarTransform {
   firstHour: number = 0;
   firstHourPx: number = 0;
   clipspace: [number, number] | null = null;
-  constructor(airdayCal: AirdayCal) {
-    this.airdayCal = airdayCal;
+  constructor(cal: PrimaveraCal) {
+    this.cal = cal;
   }
 
   // Origin date is the date at x=0, equal to utc midnight minus the days that fit between it & 0

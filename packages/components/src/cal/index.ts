@@ -1,5 +1,4 @@
-export { CalSolidWrapper } from "./solid";
-export { AirdayCal } from "./cal";
+export { PrimaveraCal } from "./cal";
 export {
   type CalendarEvent,
   type CalendarEventConstructorProps,

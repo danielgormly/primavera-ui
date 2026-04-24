@@ -1,9 +1,10 @@
-import { AirdayCal } from "../cal";
+import { PrimaveraCal } from "../cal";
 import { CalendarEvent } from "../model";
 import { localZeroDate } from "../time";
 import { DayLayout } from "./layout";
 import { CacheEntry } from "../utils/cache";
 import { appendDayLayout, CalHeaderCol, DayEl } from "./dom";
+import WorkerInstance from "./worker-instance.ts?worker&inline";
 
 function optimalWorkerCount() {
   const min = 2;
@@ -23,12 +24,7 @@ export class UIWorker {
   constructor(id: number, coordinator: EventRenderCoordinator) {
     this.coordinator = coordinator;
     this.id = id;
-    this.worker = new Worker(
-      new URL("./worker-instance.ts?worker", import.meta.url),
-      {
-        type: "module",
-      },
-    );
+    this.worker = new WorkerInstance();
     this.worker.addEventListener("error", (error) => {
       console.error("Worker error:", error);
     });
@@ -81,7 +77,7 @@ interface AllDayLrgWorkload extends Workload {
 // Processes UI events, manages workers, caches layouts
 // TODO: Break days down into tiles
 export class EventRenderCoordinator {
-  airdayCal: AirdayCal;
+  cal: PrimaveraCal;
   events: UIEvent[] = []; // Event queue
   workers: UIWorker[] = [];
   idleWorkers: Set<UIWorker> = new Set();
@@ -94,8 +90,8 @@ export class EventRenderCoordinator {
   renderedCache = new Map<number, CacheEntry<boolean>>();
   lastView?: string;
   // TODO: Keep track of cache data (layout, event) freshness per worker to avoid passing back and forth same cache (could go in CacheEntry)
-  constructor(airdayCal: AirdayCal) {
-    this.airdayCal = airdayCal;
+  constructor(cal: PrimaveraCal) {
+    this.cal = cal;
     this.createWorkerPool();
   }
   createWorkerPool() {
@@ -110,15 +106,15 @@ export class EventRenderCoordinator {
   resize() {
     for (let entry of this.domCache.entries()) {
       const [date, cache] = entry;
-      const x = this.airdayCal.transform.dateToX(date);
+      const x = this.cal.transform.dateToX(date);
       cache.data.style.transform = `translate(${x}px)`;
-      cache.data.style.width = `${this.airdayCal.transform.dayPx}px`;
+      cache.data.style.width = `${this.cal.transform.dayPx}px`;
     }
   }
   // Designed to be run on an animation frame ticks, figures out which days are dirty, starting with the assumption that none are
   // TODO: Stinky code
   tick(maxMs = 16) {
-    if (!this.airdayCal.db.ready) return;
+    if (!this.cal.db.ready) return;
     // Process events
     const start = performance.now();
     while (this.events.length > 0) {
@@ -140,26 +136,26 @@ export class EventRenderCoordinator {
     }
 
     // Setup containers
-    for (let date of this.airdayCal.transform.dates) {
+    for (let date of this.cal.transform.dates) {
       const dateVal = date.valueOf();
-      const domPx = this.airdayCal.transform.dateToX(date.valueOf());
+      const domPx = this.cal.transform.dateToX(date.valueOf());
       if (!this.domCache.get(dateVal)) {
-        const dayEl = DayEl(this.airdayCal, dateVal, domPx);
+        const dayEl = DayEl(this.cal, dateVal, domPx);
         // TODO: Clean up headerCell!
-        const headerCell = CalHeaderCol(this.airdayCal, dateVal, domPx);
-        this.airdayCal.dayHeader?.appendChild(headerCell); // TODO: append at once
-        this.airdayCal.eventsContainer?.appendChild(dayEl); // TODO: append at once
+        const headerCell = CalHeaderCol(this.cal, dateVal, domPx);
+        this.cal.dayHeader?.appendChild(headerCell); // TODO: append at once
+        this.cal.eventsContainer?.appendChild(dayEl); // TODO: append at once
         this.domCache.set(dateVal, new CacheEntry(dayEl));
       }
     }
     // TODO: Start with internal regions, then buffer.
     // TODO: Consider cleaning up a little bit
-    for (let date of this.airdayCal.transform.dates) {
+    for (let date of this.cal.transform.dates) {
       const dateVal = date.valueOf();
       const data = this.dataCache.get(dateVal);
       if (!data || !data.fresh) {
         const localZero = localZeroDate(date);
-        const events = this.airdayCal.db.getEvents(
+        const events = this.cal.db.getEvents(
           localZero,
           new Date(localZero.valueOf() + 864e5),
         );
@@ -198,8 +194,8 @@ export class EventRenderCoordinator {
             date,
             events: shortTermEvents.map((e) => e.transfer()),
             transform: [
-              this.airdayCal.transform.dayPx,
-              this.airdayCal.transform.hourPx,
+              this.cal.transform.dayPx,
+              this.cal.transform.hourPx,
             ],
           };
           this.assignWork(work);
@@ -226,10 +222,10 @@ export class EventRenderCoordinator {
         this.renderedCache.set(dateVal, new CacheEntry(true));
       }
     }
-    const minDate = this.airdayCal.transform.dates[0].valueOf();
+    const minDate = this.cal.transform.dates[0].valueOf();
     const maxDate =
-      this.airdayCal.transform.dates[
-        this.airdayCal.transform.dates.length - 1
+      this.cal.transform.dates[
+        this.cal.transform.dates.length - 1
       ].valueOf();
     // dom cache cleanup (TODO: evaluate need for dom cache cleanup)
     this.domCache.forEach((cache) => {
@@ -246,7 +242,7 @@ export class EventRenderCoordinator {
       }
     });
     // header cell cleanup
-    this.airdayCal.dayHeader?.childNodes.forEach((cell) => {
+    this.cal.dayHeader?.childNodes.forEach((cell) => {
       if (!cell.ELEMENT_NODE) return;
       const typedCell = cell as Element;
       const date = Number(typedCell.getAttribute("data-date"));
@@ -262,16 +258,16 @@ export class EventRenderCoordinator {
       }
     });
     // All day events, rendered when view changes
-    const view = `${this.airdayCal.transform.dates[0]}_${this.airdayCal.transform.dates.length}`;
+    const view = `${this.cal.transform.dates[0]}_${this.cal.transform.dates.length}`;
     if (
-      (this.airdayCal.allDayEvents && this.lastView !== view) ||
-      this.airdayCal.allDayEvents?.expanded !==
-        this.airdayCal.allDayEvents?.renderedExpanded
+      (this.cal.allDayEvents && this.lastView !== view) ||
+      this.cal.allDayEvents?.expanded !==
+        this.cal.allDayEvents?.renderedExpanded
     ) {
-      if (!this.airdayCal.allDayEvents?.expanded) {
+      if (!this.cal.allDayEvents?.expanded) {
         const work: AllDaySmlWorkload = {
           type: "all-day-sml",
-          dates: this.airdayCal.transform.dates, // TODO: Just serialise first + length
+          dates: this.cal.transform.dates, // TODO: Just serialise first + length
           cache: this.allDayCache.data,
         };
         this.assignWork(work);
@@ -280,7 +276,7 @@ export class EventRenderCoordinator {
         // TODO: This is called eventIdMap2 as it conflicts with above eventIdMap2
         // TODO: This is very smelly code
         const eventIdMap2 = new Map<string, CalendarEvent>();
-        for (let date of this.airdayCal.transform.dates) {
+        for (let date of this.cal.transform.dates) {
           const set = this.allDayCache.data.get(date.valueOf());
           set?.forEach((event) => {
             if (eventIdMap2.get(event.id)) return;
@@ -306,16 +302,16 @@ export class EventRenderCoordinator {
       }
     }
     if (type === "all-day-sml") {
-      this.airdayCal.allDayEvents?.renderContracted(
+      this.cal.allDayEvents?.renderContracted(
         message.data.events,
         message.data.labels,
       );
     }
     if (type === "all-day-lrg") {
-      this.airdayCal.allDayEvents?.renderExpanded(message.data.layout);
+      this.cal.allDayEvents?.renderExpanded(message.data.layout);
     }
     this.startWorkQueue();
-    this.airdayCal.act(); // TODO: A little blunt
+    this.cal.act(); // TODO: A little blunt
   }
   startWorkQueue() {
     if (this.queueRunning) return;

@@ -25,7 +25,7 @@ type TimeFormat = "24hr" | "12hr";
 let globalIndex = 0; // track id
 
 // Primary Calendar component, mounts to a DOM element
-export class AirdayCal {
+export class PrimaveraCal {
   id: string;
   container?: HTMLDivElement;
   scrollable?: HTMLDivElement;
@@ -49,11 +49,11 @@ export class AirdayCal {
   // current scene objects
   hover: [number, number] | null = null; // relative date, time 0-24
   coordinator = new EventRenderCoordinator(this);
-  stats?: Stats;
+  stats?: { begin: () => void; end: () => void };
   // Interactions
   dragSelect = false;
   constructor(db: EventDB) {
-    this.id = `airday-cal-${globalIndex}`;
+    this.id = `primavera-cal-${globalIndex}`;
     globalIndex++;
     createCalStyleTag(this.id);
     createColoursStyleTag(this.id, lightEventSchemes, darkEventSchemes);
@@ -142,7 +142,7 @@ export class AirdayCal {
       this.transform.timeColWidth;
     this.scrollable?.scrollTo(x, this.scrollable.scrollTop);
   }
-  enableStats(stats: Stats) {
+  enableStats(stats: { begin: () => void; end: () => void }) {
     this.stats = stats;
   }
   get colourScheme() {
