@@ -13,10 +13,10 @@ import { Code } from "astro-expressive-code/components";
 
   <div slot="sidebar">
     <h3>Settings</h3>
-    <label>Days visible <span id="days-visible-display">14</span></label>
-    <input type="range" id="days-visible" min="1" max="28" value="14" step="1">
+    <label>Days visible <span id="days-visible-display">7</span></label>
+    <input type="range" id="days-visible" min="1" max="28" value="7" step="1">
     <label>Timed events <span id="timed-count-display">500</span></label>
-    <input type="range" id="timed-count" min="0" max="5000" value="500" step="50">
+    <input type="range" id="timed-count" min="0" max="50000" value="500" step="50">
     <label>All-day events <span id="all-day-count-display">50</span></label>
     <input type="range" id="all-day-count" min="0" max="500" value="50" step="10">
     <hr>
@@ -206,13 +206,13 @@ cal.mount(document.getElementById("cal-demo"));`} lang="js" />
   });
 
   document.getElementById("reset-btn")!.addEventListener("click", () => {
-    daysVisibleSlider.value = "14";
+    daysVisibleSlider.value = "7";
     timedCountSlider.value = "500";
     allDayCountSlider.value = "50";
-    daysVisibleDisplay.textContent = "14";
+    daysVisibleDisplay.textContent = "7";
     timedCountDisplay.textContent = "500";
     allDayCountDisplay.textContent = "50";
-    buildCal(500, 50, 14);
+    buildCal(500, 50, 7);
   });
 
   const observer = new MutationObserver(() => {
