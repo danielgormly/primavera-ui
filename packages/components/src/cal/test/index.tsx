@@ -58,7 +58,7 @@ function dummyEvents(
 const oneYearAgo = new Date().getDate() - 365;
 
 const start = new Date(new Date().setDate(oneYearAgo));
-const events = dummyEvents(start, [15, 60, 120], 365 * 2, 20000);
+const events = dummyEvents(start, [15, 60, 120], 365 * 2, 10000);
 
 const startHalf = new Date(new Date().setDate(oneYearAgo));
 const events24hrs = dummyEvents(
@@ -73,5 +73,6 @@ db.loadEvents(events);
 db.loadEvents(events24hrs);
 db.ready = true;
 const cal = new PrimaveraCal(db);
+cal.setDaysVisible(7);
 
 cal.mount(domContainer);
