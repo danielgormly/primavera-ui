@@ -16,6 +16,10 @@
       "types": "./dist/dnd/index.d.ts",
       "import": "./dist/dnd.js"
     },
+    "./dnd/solid": {
+      "types": "./dist/dnd/solid/index.d.ts",
+      "import": "./dist/dnd-solid.js"
+    },
     "./cal": {
       "types": "./dist/cal/index.d.ts",
       "import": "./dist/cal.js"
@@ -30,8 +34,18 @@
   "dependencies": {
     "@flatten-js/interval-tree": "^2.0.3"
   },
+  "peerDependencies": {
+    "solid-js": "^1.9.0"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "solid-js": "^1.9.12",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vite-plugin-solid": "^2.11.12"
   }
 }

@@ -1,4 +1,4 @@
-import type { Key } from "./dnd-types";
+import type { Key } from "./types";
 
 export interface VirtualRange {
   startIndex: number;

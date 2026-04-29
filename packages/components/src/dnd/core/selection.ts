@@ -1,4 +1,4 @@
-import type { Key, Block, Selection } from "./dnd-types";
+import type { Key, Block, Selection } from "./types";
 
 /**
  * Multi-block selection model with merge logic.

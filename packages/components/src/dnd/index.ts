@@ -7,13 +7,13 @@ export type {
   DndSourceArgs,
   DndRenderer,
   DragContext,
-} from "./dnd-types";
+} from "./core/types";
 
-export { DndSource } from "./dnd-source";
-export { DndSelection } from "./dnd-selection";
-export { PrimaveraDnd } from "./dnd-container";
+export { DndSource } from "./core/source";
+export { DndSelection } from "./core/selection";
+export { PrimaveraDnd } from "./vanilla/container";
 
-import { PrimaveraDnd } from "./dnd-container";
+import { PrimaveraDnd } from "./vanilla/container";
 
 export function register() {
   if (typeof customElements === "undefined") return;

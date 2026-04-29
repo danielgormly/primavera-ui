@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>dnd (solid) · primavera-ui dev</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; padding: 1rem; }
+      #root { display: block; height: 80vh; max-width: 24rem; }
+      primavera-dnd { display: block; height: 100%; border: 1px solid #ccc; border-radius: 0.5rem; overflow: hidden; }
+      primavera-dnd [role="option"] { display: flex; align-items: center; padding: 0 0.75rem; font-size: 0.875rem; border-bottom: 1px solid #eee; user-select: none; }
+      primavera-dnd [role="option"][aria-selected="true"] { background: #dbeafe; }
+      primavera-dnd { --dnd-placeholder-color: rgba(254, 218, 124, 0.2); }
+    </style>
+  </head>
+  <body>
+    <div style="height: calc(100vh - 2em);">
+      <div id="root"></div>
+    </div>
+    <script type="module" src="./dnd-solid.tsx"></script>
+  </body>
+</html>

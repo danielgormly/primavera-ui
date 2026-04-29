@@ -1,4 +1,4 @@
-import type { Key, TxnId, DndOp, DndSourceArgs } from "./dnd-types";
+import type { Key, TxnId, DndOp, DndSourceArgs } from "./types";
 
 let txnCounter = 0;
 

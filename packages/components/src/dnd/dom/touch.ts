@@ -1,4 +1,4 @@
-import type { Key } from "./dnd-types";
+import type { Key } from "../core/types";
 
 export type TouchResult =
   | { type: "select"; key: Key }

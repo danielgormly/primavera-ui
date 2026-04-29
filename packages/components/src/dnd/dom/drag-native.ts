@@ -1,4 +1,4 @@
-import type { Key, DndRenderer } from "./dnd-types";
+import type { Key, DndRenderer } from "../core/types";
 
 /**
  * HTML5 native drag-and-drop mode.

@@ -8,11 +8,12 @@
       #dnd { display: block; height: 80vh; max-width: 24rem; border: 1px solid #ccc; border-radius: 0.5rem; overflow: hidden; }
       #dnd [role="option"] { display: flex; align-items: center; padding: 0 0.75rem; font-size: 0.875rem; border-bottom: 1px solid #eee; user-select: none; }
       #dnd [role="option"][aria-selected="true"] { background: #dbeafe; }
+      primavera-dnd { --dnd-placeholder-color: rgba(254, 218, 124, 0.2); }
     </style>
   </head>
   <body>
       <div style="height: calc(100vh - 2em);">
-    <primavera-dnd id="dnd" item-height="40" drag-type="overlay" autofocus></primavera-dnd>
+          <primavera-dnd id="dnd" item-height="40" drag-type="overlay" autofocus></primavera-dnd>
       </div>
     <script type="module" src="./dnd.ts"></script>
   </body>

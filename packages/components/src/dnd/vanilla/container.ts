@@ -1,13 +1,13 @@
-import type { Key, DndOp, DndRenderer, DragContext } from "./dnd-types";
-import { DndSource } from "./dnd-source";
-import { DndSelection } from "./dnd-selection";
-import { DndVirtualization, type VirtualRange } from "./dnd-virtualization";
-import { mapDndKeyEvent } from "./dnd-keyboard";
-import { DndCanvas } from "./dnd-canvas";
-import { DndAutoscroll } from "./dnd-autoscroll";
-import { DndDragOverlay } from "./dnd-drag-overlay";
-import { DndDragNative } from "./dnd-drag-native";
-import { DndTouch } from "./dnd-touch";
+import type { Key, DndOp, DndRenderer, DragContext } from "../core/types";
+import { DndSource } from "../core/source";
+import { DndSelection } from "../core/selection";
+import { DndVirtualization, type VirtualRange } from "../core/virtualization";
+import { mapDndKeyEvent } from "../core/keyboard";
+import { DndCanvas } from "../dom/canvas";
+import { DndAutoscroll } from "../dom/autoscroll";
+import { DndDragOverlay } from "../dom/drag-overlay";
+import { DndDragNative } from "../dom/drag-native";
+import { DndTouch } from "../dom/touch";
 
 const DRAG_BUFFER_PX = 3;
 
