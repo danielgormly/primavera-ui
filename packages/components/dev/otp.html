@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>otp · primavera-ui dev</title>
+    <style>
+      body { font-family: system-ui, sans-serif; padding: 2rem; }
+      primavera-otp { display: flex; align-items: center; gap: 0.5rem; }
+      primavera-otp-input input { height: 2.5rem; width: 2rem; text-align: center; font-size: 1rem; border: 1px solid #ccc; border-radius: 0.5rem; }
+      primavera-otp-input input:focus { outline: 2px solid #3b82f6; outline-offset: -2px; }
+    </style>
+  </head>
+  <body>
+    <primavera-otp autofocus>
+      <primavera-otp-input><input type="text" size="1" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <primavera-otp-input><input type="text" size="1" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <primavera-otp-input><input type="text" size="1" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <span>-</span>
+      <primavera-otp-input><input type="text" size="1" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <primavera-otp-input><input type="text" size="1" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+      <primavera-otp-input><input type="text" size="1" inputmode="numeric" pattern="[0-9]" /></primavera-otp-input>
+    </primavera-otp>
+    <script type="module" src="./otp.ts"></script>
+  </body>
+</html>

@@ -292,7 +292,7 @@ When `drag-type='overlay'`, a full-page overlay captures pointer events and disp
 1. Mid-drag update prevention
 2. DragContext thorough specification
 3. Nudge behaviour should be optional (this needs to be optional to support trees!)
-
+4. allow itemHeight changes! Real fix is upstream — either drop the cached fields and read the live getter, or add observedAttributes + propagate via setItemHeight(). Worth filing against primavera-ui if you control it.
 
 ## FUTURE (Out of scope)
 1. tree extension specifications

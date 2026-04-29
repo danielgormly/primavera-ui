@@ -2,7 +2,8 @@
   "name": "primavera-ui",
   "private": true,
   "scripts": {
-    "start": "cd docs && bun run dev"
+    "astro": "cd docs && bun run dev",
+    "dev": "cd packages/components && bun run dev"
   },
   "workspaces": [
     "packages/*",

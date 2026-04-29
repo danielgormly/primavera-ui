@@ -2,7 +2,10 @@ import { defineConfig } from "vite";
 import { resolve } from "path";
 
 export default defineConfig({
+  root: "dev",
   build: {
+    outDir: "../dist",
+    emptyOutDir: true,
     lib: {
       entry: {
         index: resolve(__dirname, "src/index.ts"),
