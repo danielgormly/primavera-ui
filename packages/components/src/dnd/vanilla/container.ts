@@ -63,6 +63,15 @@ export class PrimaveraDnd extends HTMLElement {
   private measuredExpandedHeight = 0;
   private expandedObserver: ResizeObserver | null = null;
 
+  // Click pair tracking — when the first click of a dblclick triggers a
+  // click-outside collapse, items below shift up and the second click can
+  // hit a different element. onDblClick recovers the intended target by
+  // preferring the previous click within the dblclick window.
+  private lastClickKey: Key | null = null;
+  private lastClickTime = 0;
+  private prevClickKey: Key | null = null;
+  private prevClickTime = 0;
+
   // ── Attribute helpers ───────────────────────────────────────────
 
   private get dragType(): "native" | "overlay" {
@@ -187,6 +196,7 @@ export class PrimaveraDnd extends HTMLElement {
       passive: false,
     });
     this.listbox.addEventListener("touchend", this.onTouchEnd);
+    document.addEventListener("click", this.onDocumentClick);
 
     // Init selection if source already set
     if (this.source) {
@@ -360,13 +370,26 @@ export class PrimaveraDnd extends HTMLElement {
     container.setAttribute("role", "option");
     container.dataset.key = String(key);
     const isExpanded = key === this.expandedKey;
+    const initialHeight = isExpanded
+      ? this.measuredExpandedHeight || this.itemHeight
+      : this.itemHeight;
     container.style.cssText = `
       position:absolute;
       top:${this.virtualization.getItemTop(index)}px;
       left:0;right:0;
-      height:${isExpanded ? "auto" : this.itemHeight + "px"};
-      transition:top 0.15s ease;
+      height:${initialHeight}px;
+      overflow:hidden;
+      transition:top 0.15s ease, height 0.15s ease;
     `;
+
+    // Inner wrapper renders at natural content height; outer's numeric
+    // height is driven from this via ResizeObserver, which lets the height
+    // transition work (CSS can't transition to/from `auto`). Absolute
+    // positioning pins content to the container's top so it reveals
+    // top-down as the container grows during the height transition.
+    const inner = document.createElement("div");
+    inner.style.cssText = "position:absolute;top:0;left:0;right:0;";
+    container.appendChild(inner);
 
     // Native drag mode
     if (this.dragType === "native") {
@@ -385,7 +408,7 @@ export class PrimaveraDnd extends HTMLElement {
       selectedKeys,
     );
 
-    const cleanup = this.renderer.mount(key, item, container);
+    const cleanup = this.renderer.mount(key, item, inner);
     this.listbox.appendChild(container);
     this.renderedItems.set(key, { element: container, cleanup, index });
 
@@ -693,6 +716,13 @@ export class PrimaveraDnd extends HTMLElement {
     if (!this.source) return;
 
     const key = this.getKeyFromEvent(e);
+
+    // Snapshot prior click for dblclick target recovery (see onDblClick).
+    this.prevClickKey = this.lastClickKey;
+    this.prevClickTime = this.lastClickTime;
+    this.lastClickKey = key;
+    this.lastClickTime = Date.now();
+
     if (key === null) return;
 
     const isMac =
@@ -713,9 +743,31 @@ export class PrimaveraDnd extends HTMLElement {
 
   private onDblClick = (e: MouseEvent): void => {
     if (!this.expansionEnabled) return;
-    const key = this.getKeyFromEvent(e);
+
+    // Prefer the FIRST click of the pair when within the dblclick window:
+    // a click-outside collapse triggered by the first click shifts items
+    // below the previously-expanded one, so the browser's dblclick target
+    // (often a common ancestor, or the second-clicked sibling) is wrong.
+    let key: Key | null = null;
+    if (
+      this.prevClickKey !== null &&
+      this.lastClickTime - this.prevClickTime < 500
+    ) {
+      key = this.prevClickKey;
+    }
+    if (key === null) key = this.getKeyFromEvent(e);
     if (key === null) return;
+
     this.toggleExpanded(key);
+  };
+
+  private onDocumentClick = (e: MouseEvent): void => {
+    if (this.expandedKey === null) return;
+    const expanded = this.renderedItems.get(this.expandedKey);
+    if (!expanded) return;
+    if (!expanded.element.contains(e.target as Node)) {
+      this.toggleExpanded(null);
+    }
   };
 
   private toggleExpanded(key: Key | null): void {
@@ -750,12 +802,15 @@ export class PrimaveraDnd extends HTMLElement {
   }
 
   /**
-   * Let the element grow to its content's natural height and observe future
-   * changes. Observer's first fire seeds measuredExpandedHeight, after which
-   * any content reflow keeps the layout in sync.
+   * Observe the inner content's natural height and drive the outer
+   * container's numeric height from it. The first fire seeds
+   * measuredExpandedHeight; subsequent fires keep layout in sync as content
+   * reflows. Driving outer numerically (rather than `height:auto`) lets the
+   * CSS height transition fire on expand/collapse.
    */
   private attachExpandedObserver(el: HTMLElement): void {
-    el.style.height = "auto";
+    const inner = el.firstElementChild as HTMLElement | null;
+    if (!inner) return;
     this.expandedObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
@@ -763,24 +818,35 @@ export class PrimaveraDnd extends HTMLElement {
       const h = box ? box.blockSize : entry.contentRect.height;
       if (Math.abs(h - this.measuredExpandedHeight) > 0.5) {
         this.measuredExpandedHeight = h;
+        el.style.height = `${h}px`;
         this.renderList();
       }
     });
-    this.expandedObserver.observe(el);
+    this.expandedObserver.observe(inner);
   }
 
   /**
-   * Clear expansion synchronously before a drag starts. We force-set heights
-   * directly on rendered items so getBoundingClientRect() in the overlay
-   * setup sees the collapsed layout — the CSS transition would otherwise
-   * leave them visibly tall for ~150ms.
+   * Clear expansion synchronously before a drag starts. We suppress the
+   * height transition and force a reflow so getBoundingClientRect() in the
+   * overlay setup sees the collapsed layout immediately — without this the
+   * 0.15s height transition would leave items visibly tall during drag.
    */
   private collapseForDrag(): void {
     if (this.expandedKey === null) return;
-    this.tearDownExpansion();
+    if (this.expandedObserver) {
+      this.expandedObserver.disconnect();
+      this.expandedObserver = null;
+    }
+    this.expandedKey = null;
+    this.measuredExpandedHeight = 0;
     this.renderer?.setExpanded?.(null);
     for (const [, item] of this.renderedItems) {
-      item.element.style.height = `${this.itemHeight}px`;
+      const el = item.element;
+      const prev = el.style.transition;
+      el.style.transition = "none";
+      el.style.height = `${this.itemHeight}px`;
+      void el.offsetHeight;
+      el.style.transition = prev;
     }
     this.virtualization.setExpanded(null, this.itemHeight);
   }
@@ -1154,6 +1220,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.listbox?.removeEventListener("touchstart", this.onTouchStart);
     this.listbox?.removeEventListener("touchmove", this.onTouchMove);
     this.listbox?.removeEventListener("touchend", this.onTouchEnd);
+    document.removeEventListener("click", this.onDocumentClick);
     document.removeEventListener("mousemove", this.onDocMouseMove);
     document.removeEventListener("mouseup", this.onDocMouseUp);
     this.resizeObserver?.disconnect();

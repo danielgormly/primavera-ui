@@ -114,3 +114,31 @@ Worth mentiong that the browser-native scroll is pretty smooth, but not tight en
 ### CSS custom property convention
 
 All component-level styling hooks use the `--dnd-*` namespace (e.g. `--dnd-row-bg`, `--dnd-drag-shadow`, `--dnd-placeholder-color`). No per-instance namespace segment is needed — consumers can scope overrides to specific instances using standard CSS selectors on any ancestor or the `<primavera-dnd>` element itself.
+
+## Expansion: animating height
+
+CSS cannot transition `height: auto`, but we want the expanded item's height change to feel coherent with the surrounding `top` transitions (0.15s ease).
+
+**Layout:** the renderer's content is mounted into an inner wrapper, absolutely positioned at the container's top (`position:absolute; top:0; left:0; right:0`). The outer container has a numeric pixel height, `overflow:hidden`, and `transition: top 0.15s ease, height 0.15s ease`. A `ResizeObserver` on the inner wrapper feeds the natural content height onto the outer's `style.height`, which is what makes the height transition fire.
+
+**Why anchor inner to the top:** with absolute positioning, the inner sits at the container's top edge regardless of margin collapsing or normal-flow quirks in the consumer's content. The visible reveal is always top-down as the container grows.
+
+**Initial mount of an already-expanded item** (e.g. scrolled back into view) uses the cached `measuredExpandedHeight` so it appears at the right size without an animation flash.
+
+**`collapseForDrag` must not animate.** Drag setup calls `getBoundingClientRect()` on the items, which would otherwise see a still-expanded layout for the 0.15s of the height transition. Suppress the transition for the synchronous collapse: set `transition: none`, write the new height, force a reflow (`void el.offsetHeight`), restore the prior `transition`. Tear down the observer and clear `expandedKey` directly — do not route through the regular `tearDownExpansion` which assumes an animated collapse.
+
+## Expansion: click-outside collapse + dblclick race
+
+Click-outside-to-collapse is implemented with a document-level `click` listener: if the click target is not contained by the expanded item's element, collapse.
+
+This creates a race when the user double-clicks an item *below* the expanded one:
+
+1. First click hits item B → click-outside fires → expanded item A collapses → items below A shift up (0.15s `top` transition).
+2. Second click of the intended dblclick lands on item C (now under the cursor where B used to be).
+3. Browser's `dblclick` event fires on the common ancestor (the listbox) or the second-clicked sibling — neither matches the user's intent.
+
+**Fix:** every `click` snapshots the prior click's key and timestamp into `prevClickKey` / `prevClickTime` (before overwriting `lastClickKey` / `lastClickTime`). In `dblclick`, if `prevClickKey` is set and `lastClickTime - prevClickTime < 500ms`, prefer it over the event's own target.
+
+The 500ms window matches the browser's dblclick threshold and is comfortably greater than the 150ms shift animation, so even mid-animation second clicks recover correctly. For an isolated normal dblclick (no shift), the snapshot equals the current target — recovery is a no-op.
+
+The browser already enforces a small mouse-movement tolerance for `dblclick`, so this heuristic only fires when the user genuinely held the cursor still for both clicks — i.e. when their intent really was a dblclick on the original target.

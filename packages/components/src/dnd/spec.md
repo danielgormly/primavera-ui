@@ -283,7 +283,22 @@ When `drag-type='overlay'`, a full-page overlay captures pointer events and disp
 - Grab offset: the stack anchors relative to the element that initiated the drag (not the first selected item). Compute `grabOffset = elementRect.topLeft - cursorPosition` at drag start and apply to all position updates.
 
 ## Expansion
-When `expandable` is set, double-clicking an item toggles a single-item expanded state — the item's height is set to `auto` and a `ResizeObserver` feeds the measured content height into virtualization, pushing items below down by the difference. Escape collapses the open item, and starting a drag clears expansion (so all drag-mode math stays uniform-height).
+When `expandable` is set, double-clicking an item toggles a single-item expanded state. Only one item is expanded at a time. The renderer is invoked once per item with an `expanded` prop — the same component instance just re-renders when its expansion flag flips, so the consumer can branch on `expanded()` to render an extra body. Expand/collapse is mutually exclusive with selection from a UX standpoint; the two states should not be conflated.
+
+### Behaviour
+- Double-clicking the expanded item, pressing `Escape`, or clicking anywhere outside it collapses.
+- Double-clicking a different item collapses the current and expands the new one atomically.
+- Starting a drag clears expansion synchronously (no animation) so drag-mode math stays uniform-height.
+
+### Height & layout
+- The expanded item's height transitions over `0.15s ease`, matching the `top` transition used for surrounding items as they shift down.
+- The expanded item's contents are pinned to the top of the container; as the container grows, content reveals top-down (the rest is clipped by `overflow:hidden` during the animation).
+- The measured expanded height is fed into virtualization, pushing items below down by the difference (also via the `top` transition).
+
+### Click-outside + dblclick recovery
+A click anywhere outside the expanded item collapses it. When the user double-clicks an item *below* the expanded one, the first click triggers a click-outside collapse — items below shift up, and the second click of the intended dblclick lands on a different element.
+
+To recover the user's intent, every `click` snapshots the prior click's target and timestamp. In `dblclick`, if the snapshot is within the dblclick window (500ms — comfortably above the 0.15s shift animation), it is used as the target instead of the `dblclick` event's own target (which is typically the common ancestor of the two diverged clicks, or the second-clicked sibling).
 
 ## Touch devices (differences from mouse drag/select model)
 1. Multi-select is currently not possible on touch devices.
