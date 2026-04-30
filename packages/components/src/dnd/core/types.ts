@@ -38,3 +38,10 @@ export interface DndRenderer<T> {
 export interface DragContext {
   register(renderer: DndRenderer<any>, source: any): void;
 }
+
+export interface DndDragEventDetail<T = unknown> {
+  keys: Key[];
+  items: T[];
+  x: number;
+  y: number;
+}

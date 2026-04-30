@@ -283,6 +283,15 @@ When `drag-type='overlay'`, a full-page overlay captures pointer events and disp
 - Count badge is a direct child of the overlay (not a stack item) to avoid being clipped. It tracks the first stack item's position in the animation loop, anchored at top-right.
 - Grab offset: the stack anchors relative to the element that initiated the drag (not the first selected item). Compute `grabOffset = elementRect.topLeft - cursorPosition` at drag start and apply to all position updates.
 
+### Foreign drop zones (overlay mode)
+
+The component dispatches three bubbling, composed `CustomEvent`s on the `<primavera-dnd>` element with `detail: { keys, items, x, y }`:
+- `primavera-dnd-dragstart` — fires once when overlay drag begins.
+- `primavera-dnd-dragmove` — fires on every cursor/touch update during drag.
+- `primavera-dnd-dragend` — fires once on release. Cancelable: a foreign drop zone that consumes the drag calls `preventDefault()` to suppress the internal reorder.
+
+Drop zones in the consumer app listen on `dragstart` to enter a "drop-active" mode, hit-test their own bounds during `dragmove` to render hover state, and on `dragend` either consume (mutate consumer state, `preventDefault()`) or do nothing (let the source list handle the drop normally). Native drag mode does not emit these — its consumers use the platform's HTML5 `dragstart`/`dragover`/`drop`/`dragend` events instead.
+
 ## Expansion
 When `expandable` is set, double-clicking an item toggles a single-item expanded state. Only one item is expanded at a time. The renderer is invoked once per item with an `expanded` prop — the same component instance just re-renders when its expansion flag flips, so the consumer can branch on `expanded()` to render an extra body. Expand/collapse is mutually exclusive with selection from a UX standpoint; the two states should not be conflated.
 

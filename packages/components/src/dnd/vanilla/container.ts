@@ -968,6 +968,8 @@ export class PrimaveraDnd extends HTMLElement {
     this.updateHoverIndex();
     this.updatePlaceholder();
     if (this.nudge) this.applyNudge();
+
+    this.dispatchDrag("move", e.clientX, e.clientY);
   };
 
   private onDocMouseUp = (e: MouseEvent): void => {
@@ -1033,14 +1035,47 @@ export class PrimaveraDnd extends HTMLElement {
     if (this.parent.scrollTop > maxScroll) {
       this.parent.scrollTop = Math.max(0, maxScroll);
     }
+
+    this.dispatchDrag("start", x, y);
+  }
+
+  /**
+   * Overlay-mode drag lifecycle event. Foreign drop zones listen for these
+   * to highlight on hover and consume on release. `dragend` is cancelable —
+   * a consuming zone calls `preventDefault()` to skip the internal reorder.
+   * Native mode users rely on the platform's HTML5 drag events instead.
+   */
+  private dispatchDrag(
+    type: "start" | "move" | "end",
+    x: number,
+    y: number,
+  ): boolean {
+    if (this.dragType !== "overlay") return false;
+    if (this.draggedKeys.length === 0) return false;
+    const items = this.source
+      ? this.draggedKeys
+          .map((k) => this.source!.getItem(k))
+          .filter((i): i is unknown => i !== undefined)
+      : [];
+    const event = new CustomEvent(`primavera-dnd-drag${type}`, {
+      bubbles: true,
+      composed: true,
+      cancelable: type === "end",
+      detail: { keys: [...this.draggedKeys], items, x, y },
+    });
+    this.dispatchEvent(event);
+    return event.defaultPrevented;
   }
 
   private endDrag(): void {
+    const pos = this.lastPointerPos ?? { x: 0, y: 0 };
+    const consumed = this.dispatchDrag("end", pos.x, pos.y);
+
     this.dragOverlay.stop();
     this.autoscroll.stop();
     this.canvas.clear();
 
-    if (this.hoverIndex !== null && this.source) {
+    if (!consumed && this.hoverIndex !== null && this.source) {
       // Compute the beforeKey from hoverIndex
       const beforeKey =
         this.hoverIndex < this.collapsedOrder.length
@@ -1204,6 +1239,7 @@ export class PrimaveraDnd extends HTMLElement {
           this.updatePlaceholder();
           if (this.nudge) this.applyNudge();
         }
+        this.dispatchDrag("move", result.x, result.y);
         break;
 
       case "scroll":

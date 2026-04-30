@@ -7,6 +7,7 @@ export type {
   DndSourceArgs,
   DndRenderer,
   DragContext,
+  DndDragEventDetail,
 } from "./core/types";
 
 export { DndSource } from "./core/source";
