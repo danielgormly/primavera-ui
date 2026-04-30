@@ -367,28 +367,23 @@ export class PrimaveraDnd extends HTMLElement {
     if (item === undefined) return;
 
     const container = document.createElement("div");
+    container.className = "dnd-item";
     container.setAttribute("role", "option");
     container.dataset.key = String(key);
     const isExpanded = key === this.expandedKey;
     const initialHeight = isExpanded
       ? this.measuredExpandedHeight || this.itemHeight
       : this.itemHeight;
-    container.style.cssText = `
-      position:absolute;
-      top:${this.virtualization.getItemTop(index)}px;
-      left:0;right:0;
-      height:${initialHeight}px;
-      overflow:hidden;
-      transition:top 0.15s ease, height 0.15s ease;
-    `;
+    container.style.top = `${this.virtualization.getItemTop(index)}px`;
+    container.style.height = `${initialHeight}px`;
 
-    // Inner wrapper renders at natural content height; outer's numeric
-    // height is driven from this via ResizeObserver, which lets the height
-    // transition work (CSS can't transition to/from `auto`). Absolute
-    // positioning pins content to the container's top so it reveals
-    // top-down as the container grows during the height transition.
+    // Inner wrapper fills the container when collapsed so consumer
+    // content can size with `height: 100%`. When expanded (data-expanded),
+    // it switches to natural height so the ResizeObserver in
+    // attachExpandedObserver can drive the outer's animated height.
     const inner = document.createElement("div");
-    inner.style.cssText = "position:absolute;top:0;left:0;right:0;";
+    inner.className = "dnd-item-inner";
+    if (isExpanded) inner.dataset.expanded = "";
     container.appendChild(inner);
 
     // Native drag mode
@@ -501,7 +496,33 @@ export class PrimaveraDnd extends HTMLElement {
   }
 
   private updateRoundedSelectStyles(): void {
-    const base = `[data-selected] { background: var(--dnd-select-bg, transparent); }`;
+    // Item containers and their inner wrappers carry only dynamic
+    // top/height inline; the static positioning lives here so consumer
+    // dev tools stay legible. The inner fills the container by default
+    // (so a row with `height: 100%` resolves correctly); the expanded
+    // item gets `data-expanded` to release `bottom` so the inner can
+    // grow to its natural content height — that's what feeds the
+    // ResizeObserver in attachExpandedObserver().
+    const base = `
+      .dnd-item {
+        position: absolute;
+        left: 0;
+        right: 0;
+        overflow: hidden;
+        transition: top 0.15s ease, height 0.15s ease;
+      }
+      .dnd-item-inner {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+      }
+      .dnd-item-inner[data-expanded] {
+        bottom: auto;
+      }
+      [data-selected] { background: var(--dnd-select-bg, transparent); }
+    `;
     if (!this.roundedSelect) {
       this.styleEl.textContent = base;
       return;
@@ -791,7 +812,11 @@ export class PrimaveraDnd extends HTMLElement {
       // collapse with the expanded item as the sole selected entry.
       this.selection.selectOnly(next);
       const item = this.renderedItems.get(next);
-      if (item) this.attachExpandedObserver(item.element);
+      if (item) {
+        const inner = item.element.firstElementChild as HTMLElement | null;
+        if (inner) inner.dataset.expanded = "";
+        this.attachExpandedObserver(item.element);
+      }
     }
 
     this.renderList();
@@ -805,7 +830,11 @@ export class PrimaveraDnd extends HTMLElement {
     }
     if (this.expandedKey !== null) {
       const old = this.renderedItems.get(this.expandedKey);
-      if (old) old.element.style.height = `${this.itemHeight}px`;
+      if (old) {
+        old.element.style.height = `${this.itemHeight}px`;
+        const inner = old.element.firstElementChild as HTMLElement | null;
+        if (inner) delete inner.dataset.expanded;
+      }
     }
     this.expandedKey = null;
     this.measuredExpandedHeight = 0;
@@ -846,6 +875,11 @@ export class PrimaveraDnd extends HTMLElement {
     if (this.expandedObserver) {
       this.expandedObserver.disconnect();
       this.expandedObserver = null;
+    }
+    const old = this.renderedItems.get(this.expandedKey);
+    if (old) {
+      const inner = old.element.firstElementChild as HTMLElement | null;
+      if (inner) delete inner.dataset.expanded;
     }
     this.expandedKey = null;
     this.measuredExpandedHeight = 0;
