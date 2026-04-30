@@ -58,6 +58,11 @@ export class PrimaveraDnd extends HTMLElement {
   private collapsedOrder: Key[] = [];
   private visualIndexMap = new Map<Key, number>();
 
+  // Expansion state (single item at a time)
+  private expandedKey: Key | null = null;
+  private measuredExpandedHeight = 0;
+  private expandedObserver: ResizeObserver | null = null;
+
   // ── Attribute helpers ───────────────────────────────────────────
 
   private get dragType(): "native" | "overlay" {
@@ -80,6 +85,10 @@ export class PrimaveraDnd extends HTMLElement {
 
   private get itemHeight(): number {
     return parseInt(this.getAttribute("item-height") || "32", 10);
+  }
+
+  private get expansionEnabled(): boolean {
+    return this.hasAttribute("expandable");
   }
 
   private get confineAutoscroll(): boolean {
@@ -170,6 +179,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.listbox.addEventListener("keydown", this.onKeyDown);
     this.listbox.addEventListener("mousedown", this.onMouseDown);
     this.listbox.addEventListener("click", this.onClick);
+    this.listbox.addEventListener("dblclick", this.onDblClick);
     this.listbox.addEventListener("touchstart", this.onTouchStart, {
       passive: false,
     });
@@ -233,6 +243,23 @@ export class PrimaveraDnd extends HTMLElement {
     const order = this.source.getOrder();
     this.selection.updateOrder(order);
 
+    // Sync expanded state into virtualization. Expansion is suppressed
+    // during drag so collapsed-order math stays uniform-height.
+    let expandedIndex: number | null = null;
+    if (!this.isDragging && this.expandedKey !== null) {
+      const idx = order.indexOf(this.expandedKey);
+      if (idx === -1) {
+        // Expanded item was removed from source — clear it.
+        this.tearDownExpansion();
+      } else {
+        expandedIndex = idx;
+      }
+    }
+    this.virtualization.setExpanded(
+      expandedIndex,
+      this.measuredExpandedHeight || this.itemHeight,
+    );
+
     const scrollTop = this.parent.scrollTop;
     const viewportHeight = this.parent.clientHeight;
     const selectedKeys = new Set(this.selection.getSelectedKeys());
@@ -254,6 +281,10 @@ export class PrimaveraDnd extends HTMLElement {
       // Remove items no longer in range (keep dragged items cached)
       for (const [key, item] of this.renderedItems) {
         if (!keysToRender.has(key) && !this.dragSet.has(key)) {
+          if (key === this.expandedKey && this.expandedObserver) {
+            this.expandedObserver.disconnect();
+            this.expandedObserver = null;
+          }
           item.cleanup();
           item.element.remove();
           this.renderedItems.delete(key);
@@ -267,7 +298,7 @@ export class PrimaveraDnd extends HTMLElement {
         const fullIndex = order.indexOf(key);
         const existing = this.renderedItems.get(key);
         if (existing) {
-          this.updateItemPosition(existing, i);
+          this.updateItemPosition(existing, i, key);
           this.updateItemSelection(existing, key, fullIndex, order, selectedKeys);
         } else {
           this.mountItem(key, i, order, selectedKeys);
@@ -289,6 +320,10 @@ export class PrimaveraDnd extends HTMLElement {
 
       for (const [key, item] of this.renderedItems) {
         if (!keysToRender.has(key)) {
+          if (key === this.expandedKey && this.expandedObserver) {
+            this.expandedObserver.disconnect();
+            this.expandedObserver = null;
+          }
           item.cleanup();
           item.element.remove();
           this.renderedItems.delete(key);
@@ -300,7 +335,7 @@ export class PrimaveraDnd extends HTMLElement {
         const key = order[i];
         const existing = this.renderedItems.get(key);
         if (existing) {
-          this.updateItemPosition(existing, i);
+          this.updateItemPosition(existing, i, key);
           this.updateItemSelection(existing, key, i, order, selectedKeys);
         } else {
           this.mountItem(key, i, order, selectedKeys);
@@ -324,11 +359,12 @@ export class PrimaveraDnd extends HTMLElement {
     const container = document.createElement("div");
     container.setAttribute("role", "option");
     container.dataset.key = String(key);
+    const isExpanded = key === this.expandedKey;
     container.style.cssText = `
       position:absolute;
       top:${this.virtualization.getItemTop(index)}px;
       left:0;right:0;
-      height:${this.itemHeight}px;
+      height:${isExpanded ? "auto" : this.itemHeight + "px"};
       transition:top 0.15s ease;
     `;
 
@@ -352,11 +388,23 @@ export class PrimaveraDnd extends HTMLElement {
     const cleanup = this.renderer.mount(key, item, container);
     this.listbox.appendChild(container);
     this.renderedItems.set(key, { element: container, cleanup, index });
+
+    // Re-mount of an already-expanded item (e.g. scrolled back into view):
+    // re-attach observer so we keep tracking its content height.
+    if (isExpanded && !this.expandedObserver) {
+      this.attachExpandedObserver(container);
+    }
   }
 
-  private updateItemPosition(item: RenderedItem, index: number): void {
-    const newTop = this.virtualization.getItemTop(index);
-    item.element.style.top = `${newTop}px`;
+  private updateItemPosition(
+    item: RenderedItem,
+    index: number,
+    key: Key,
+  ): void {
+    item.element.style.top = `${this.virtualization.getItemTop(index)}px`;
+    if (key !== this.expandedKey) {
+      item.element.style.height = `${this.itemHeight}px`;
+    }
     item.index = index;
   }
 
@@ -489,6 +537,14 @@ export class PrimaveraDnd extends HTMLElement {
 
   private onKeyDown = (e: KeyboardEvent): void => {
     if (!this.source) return;
+
+    // Escape collapses the expanded item before falling through to selection-clear
+    if (e.key === "Escape" && this.expandedKey !== null) {
+      e.preventDefault();
+      this.toggleExpanded(null);
+      return;
+    }
+
     const action = mapDndKeyEvent(e);
     if (action.type === "ignore") return;
 
@@ -655,6 +711,80 @@ export class PrimaveraDnd extends HTMLElement {
     this.renderList();
   };
 
+  private onDblClick = (e: MouseEvent): void => {
+    if (!this.expansionEnabled) return;
+    const key = this.getKeyFromEvent(e);
+    if (key === null) return;
+    this.toggleExpanded(key);
+  };
+
+  private toggleExpanded(key: Key | null): void {
+    const next = key !== null && this.expandedKey !== key ? key : null;
+    if (next === this.expandedKey) return;
+
+    this.tearDownExpansion();
+
+    this.expandedKey = next;
+    this.renderer?.setExpanded?.(next);
+
+    if (next !== null) {
+      const item = this.renderedItems.get(next);
+      if (item) this.attachExpandedObserver(item.element);
+    }
+
+    this.renderList();
+  }
+
+  /** Detach observer, restore collapsed height on the previously expanded element. */
+  private tearDownExpansion(): void {
+    if (this.expandedObserver) {
+      this.expandedObserver.disconnect();
+      this.expandedObserver = null;
+    }
+    if (this.expandedKey !== null) {
+      const old = this.renderedItems.get(this.expandedKey);
+      if (old) old.element.style.height = `${this.itemHeight}px`;
+    }
+    this.expandedKey = null;
+    this.measuredExpandedHeight = 0;
+  }
+
+  /**
+   * Let the element grow to its content's natural height and observe future
+   * changes. Observer's first fire seeds measuredExpandedHeight, after which
+   * any content reflow keeps the layout in sync.
+   */
+  private attachExpandedObserver(el: HTMLElement): void {
+    el.style.height = "auto";
+    this.expandedObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const box = entry.borderBoxSize?.[0];
+      const h = box ? box.blockSize : entry.contentRect.height;
+      if (Math.abs(h - this.measuredExpandedHeight) > 0.5) {
+        this.measuredExpandedHeight = h;
+        this.renderList();
+      }
+    });
+    this.expandedObserver.observe(el);
+  }
+
+  /**
+   * Clear expansion synchronously before a drag starts. We force-set heights
+   * directly on rendered items so getBoundingClientRect() in the overlay
+   * setup sees the collapsed layout — the CSS transition would otherwise
+   * leave them visibly tall for ~150ms.
+   */
+  private collapseForDrag(): void {
+    if (this.expandedKey === null) return;
+    this.tearDownExpansion();
+    this.renderer?.setExpanded?.(null);
+    for (const [, item] of this.renderedItems) {
+      item.element.style.height = `${this.itemHeight}px`;
+    }
+    this.virtualization.setExpanded(null, this.itemHeight);
+  }
+
   private onMouseDown = (e: MouseEvent): void => {
     if (!this.source || e.button !== 0) return;
     if (this.dragType === "native") return; // native drag handles itself
@@ -718,6 +848,10 @@ export class PrimaveraDnd extends HTMLElement {
   };
 
   private startOverlayDrag(x: number, y: number): void {
+    // Drag always operates on uniform-height layout — collapse first so
+    // grab-offset and overlay sizing math stay correct.
+    this.collapseForDrag();
+
     this.isDragging = true;
     this.listbox.style.overflow = "hidden";
     this.draggedKeys = this.selection.getSelectedKeys();
@@ -817,6 +951,7 @@ export class PrimaveraDnd extends HTMLElement {
       this.selection.selectOnly(key);
     }
 
+    this.collapseForDrag();
     this.isDragging = true;
     this.draggedKeys = this.selection.getSelectedKeys();
     this.dragSet = new Set(this.draggedKeys);
@@ -1015,6 +1150,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.listbox?.removeEventListener("keydown", this.onKeyDown);
     this.listbox?.removeEventListener("mousedown", this.onMouseDown);
     this.listbox?.removeEventListener("click", this.onClick);
+    this.listbox?.removeEventListener("dblclick", this.onDblClick);
     this.listbox?.removeEventListener("touchstart", this.onTouchStart);
     this.listbox?.removeEventListener("touchmove", this.onTouchMove);
     this.listbox?.removeEventListener("touchend", this.onTouchEnd);
@@ -1026,6 +1162,10 @@ export class PrimaveraDnd extends HTMLElement {
     this.dragOverlay?.stop();
     this.touch?.cancel();
     if (this.sourceUnsub) this.sourceUnsub();
+    if (this.expandedObserver) {
+      this.expandedObserver.disconnect();
+      this.expandedObserver = null;
+    }
     this.clearAllItems();
   }
 }

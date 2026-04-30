@@ -27,6 +27,8 @@ export interface DndSourceArgs<T> {
 
 export interface DndRenderer<T> {
   mount(key: Key, item: T, container: HTMLElement): () => void;
+  /** Called by the container when the expanded item changes. */
+  setExpanded?(key: Key | null): void;
   getNativeDropData?(
     keys: Key[],
     items: T[],

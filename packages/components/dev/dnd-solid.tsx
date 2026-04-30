@@ -18,9 +18,21 @@ function App() {
       setItems={setItems}
       getKey={(i) => i.id}
       itemHeight={40}
+      expandable
       autofocus
     >
-      {(item) => <span>{item().label}</span>}
+      {(item, expanded) => (
+        <div style={{ padding: "8px 12px", "box-sizing": "border-box" }}>
+          <div>{item().label}</div>
+          {expanded() && (
+            <div style={{ "margin-top": "8px", color: "#666", "font-size": "13px" }}>
+              <div>Expanded body for {item().label}.</div>
+              <div>Double-click to collapse, or press Escape.</div>
+              <div>Items below are pushed down by the extra height.</div>
+            </div>
+          )}
+        </div>
+      )}
     </Dnd>
   );
 }

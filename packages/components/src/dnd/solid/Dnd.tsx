@@ -1,5 +1,6 @@
 import {
   createMemo,
+  createSignal,
   onMount,
   onCleanup,
   createEffect,
@@ -19,6 +20,7 @@ declare module "solid-js" {
     }
     interface ExplicitAttributes {
       "item-height": string;
+      expandable: string;
       "drag-type": "native" | "overlay";
       overscan: string;
       "confine-autoscroll": string;
@@ -37,6 +39,7 @@ export interface DndProps<T> {
   onReorder?: (op: DndOp<T>) => void;
   getKey: (item: T) => Key;
   itemHeight?: number;
+  expandable?: boolean;
   overscan?: number;
   confineAutoscroll?: boolean;
   autoscrollBuffer?: number;
@@ -47,7 +50,7 @@ export interface DndProps<T> {
   dragType?: "native" | "overlay";
   class?: string;
   style?: JSX.CSSProperties | string;
-  children: (item: () => T) => JSX.Element;
+  children: (item: () => T, expanded: () => boolean) => JSX.Element;
 }
 
 export function Dnd<T>(props: DndProps<T>): JSX.Element {
@@ -62,13 +65,19 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     return m;
   });
 
+  const [expandedKey, setExpandedKey] = createSignal<Key | null>(null);
+
   const renderer: DndRenderer<T> = {
     mount(key, initialItem, container) {
       const dispose = render(() => {
         const item = createMemo(() => keyIndex().get(key) ?? initialItem);
-        return props.children(item);
+        const expanded = createMemo(() => expandedKey() === key);
+        return props.children(item, expanded);
       }, container);
       return dispose;
+    },
+    setExpanded(key) {
+      setExpandedKey(() => key);
     },
   };
 
@@ -131,6 +140,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       class={props.class}
       style={props.style as any}
       attr:item-height={String(props.itemHeight ?? 40)}
+      attr:expandable={props.expandable ? "" : undefined}
       attr:drag-type={props.dragType ?? "overlay"}
       attr:overscan={props.overscan != null ? String(props.overscan) : undefined}
       attr:confine-autoscroll={String(props.confineAutoscroll ?? true)}
