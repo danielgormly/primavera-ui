@@ -289,6 +289,7 @@ When `expandable` is set, double-clicking an item toggles a single-item expanded
 - Double-clicking the expanded item, pressing `Escape`, or clicking anywhere outside it collapses.
 - Double-clicking a different item collapses the current and expands the new one atomically.
 - Starting a drag clears expansion synchronously (no animation) so drag-mode math stays uniform-height.
+- Expanding sets selection to just the expanded item, and selection chrome is suppressed everywhere while anything is expanded — the expanded item is the visual focus and should not also wear select chrome. On collapse the chrome reappears with the previously-expanded item as the sole selected entry; clicking another item to collapse lets that click's selection win naturally.
 
 ### Height & layout
 - The expanded item's height transitions over `0.15s ease`, matching the `top` transition used for surrounding items as they shift down.

@@ -438,7 +438,9 @@ export class PrimaveraDnd extends HTMLElement {
     order: readonly Key[],
     selectedKeys: Set<Key>,
   ): void {
-    const isSelected = selectedKeys.has(key);
+    // While anything is expanded, selection chrome is suppressed everywhere —
+    // the expanded item is the visual focus and should not also wear select chrome.
+    const isSelected = this.expandedKey === null && selectedKeys.has(key);
     item.element.setAttribute("aria-selected", String(isSelected));
 
     if (isSelected) {
@@ -780,6 +782,10 @@ export class PrimaveraDnd extends HTMLElement {
     this.renderer?.setExpanded?.(next);
 
     if (next !== null) {
+      // Selection collapses to just the expanded item; chrome is suppressed
+      // in updateItemSelection while expandedKey is set, then reappears on
+      // collapse with the expanded item as the sole selected entry.
+      this.selection.selectOnly(next);
       const item = this.renderedItems.get(next);
       if (item) this.attachExpandedObserver(item.element);
     }
