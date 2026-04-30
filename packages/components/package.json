@@ -28,6 +28,7 @@
   "scripts": {
     "dev": "bun --bun x vite",
     "build": "bun --bun x vite build && bun --bun x tsc --emitDeclarationOnly",
+    "start": "bun run dev",
     "watch": "bun --bun x vite build --watch",
     "preview": "bun --bun x vite preview"
   },

@@ -115,6 +115,7 @@ interface DragContext {
 5. The height of `list` is defined by `max((qty(visibleItems) + 2) * height(listitem), height(parent))`. The 2 is for a small amount of buffer at the end of a list. The `max` with parent height ensures the list always fills the scroll container, even when most items are hidden (e.g. during drag with many selected items).
 6. Only items within view + overscan either side will be rendered. The top-most item index `startIndex = max(floor(scrollTop / H) - overscan, 0)` where `overscan` is a fixed value (usually 2). The end index is defined by `endIndex = min(startIndex + ceil(viewportHeight / H) + overscan*2, count)`. A range is held in state that updates as `scrollYOffset(parent)` changes, e.g. due to scrolling. As the range changes, new items in the range render, and items outside the range drop off. There is the option here for a pool of hot rendered items.
 7. One or more items can be selected. A set of item keys will be used to track selected items. And a Key[] to maintain order. `aria-selected: true` will be applied on these elements if rendered. Select is probably best managed with its own controller per list.
+8. Selected items get `z-index: 1` so they paint above unselected siblings during top transitions and where selection chrome (background, rounded corners) overlaps neighbours.
 
 ## Selection
 

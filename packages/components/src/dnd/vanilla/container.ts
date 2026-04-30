@@ -547,7 +547,7 @@ export class PrimaveraDnd extends HTMLElement {
       .dnd-item-inner[data-expanded] {
         bottom: auto;
       }
-      [data-selected] { background: var(--dnd-select-bg, transparent); }
+      [data-selected] { background: var(--dnd-select-bg, transparent); z-index: 1; }
     `;
     if (!this.roundedSelect) {
       this.styleEl.textContent = base;
