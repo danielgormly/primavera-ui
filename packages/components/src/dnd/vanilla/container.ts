@@ -760,6 +760,10 @@ export class PrimaveraDnd extends HTMLElement {
     if (key === null) key = this.getKeyFromEvent(e);
     if (key === null) return;
 
+    // Dblclick on the already-expanded item is a no-op; collapse paths are
+    // Escape, click-outside, and drag start.
+    if (key === this.expandedKey) return;
+
     this.toggleExpanded(key);
   };
 

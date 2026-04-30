@@ -286,7 +286,7 @@ When `drag-type='overlay'`, a full-page overlay captures pointer events and disp
 When `expandable` is set, double-clicking an item toggles a single-item expanded state. Only one item is expanded at a time. The renderer is invoked once per item with an `expanded` prop — the same component instance just re-renders when its expansion flag flips, so the consumer can branch on `expanded()` to render an extra body. Expand/collapse is mutually exclusive with selection from a UX standpoint; the two states should not be conflated.
 
 ### Behaviour
-- Double-clicking the expanded item, pressing `Escape`, or clicking anywhere outside it collapses.
+- Pressing `Escape` or clicking anywhere outside the expanded item collapses. Double-clicking the expanded item itself is a no-op.
 - Double-clicking a different item collapses the current and expands the new one atomically.
 - Starting a drag clears expansion synchronously (no animation) so drag-mode math stays uniform-height.
 - Expanding sets selection to just the expanded item, and selection chrome is suppressed everywhere while anything is expanded — the expanded item is the visual focus and should not also wear select chrome. On collapse the chrome reappears with the previously-expanded item as the sole selected entry; clicking another item to collapse lets that click's selection win naturally.
