@@ -45,6 +45,7 @@ export class PrimaveraDnd extends HTMLElement {
   private initialized = false;
   private resizeObserver: ResizeObserver | null = null;
   private sourceUnsub: (() => void) | null = null;
+  private sourceSyncUnsub: (() => void) | null = null;
   private selectionUnsub: (() => void) | null = null;
 
   // Drag state
@@ -132,11 +133,19 @@ export class PrimaveraDnd extends HTMLElement {
 
   setSource(source: DndSource<any>): void {
     if (this.sourceUnsub) this.sourceUnsub();
+    if (this.sourceSyncUnsub) this.sourceSyncUnsub();
     this.source = source;
     this.ensureSelection();
     this.selection.updateOrder(source.getOrder());
 
     this.sourceUnsub = source.onChange(() => {
+      this.selection.updateOrder(source.getOrder());
+      if (this.initialized) this.renderList();
+    });
+    // Host-driven order resyncs (`source.syncOrder()`) — adds, removes,
+    // external reorders. Without this, host state changes update the
+    // source's `cachedOrder` but never reach the DOM.
+    this.sourceSyncUnsub = source.onOrderSync(() => {
       this.selection.updateOrder(source.getOrder());
       if (this.initialized) this.renderList();
     });
@@ -1333,6 +1342,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.dragOverlay?.stop();
     this.touch?.cancel();
     if (this.sourceUnsub) this.sourceUnsub();
+    if (this.sourceSyncUnsub) this.sourceSyncUnsub();
     if (this.selectionUnsub) this.selectionUnsub();
     if (this.expandedObserver) {
       this.expandedObserver.disconnect();

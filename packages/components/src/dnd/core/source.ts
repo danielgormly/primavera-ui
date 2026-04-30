@@ -14,6 +14,13 @@ export class DndSource<T> {
     { ops: DndOp<T>[]; previewOrder: Key[] }
   >();
   private changeListeners = new Set<(op: DndOp<T>, txnId: TxnId) => void>();
+  /** Fired after `syncOrder()` updates `cachedOrder` from the host.
+   *  Distinct from `changeListeners`, which carry user-committed ops
+   *  (drag/drop / programmatic apply) — `onOrderSync` is the host
+   *  saying "I rebuilt the array externally, please re-render."
+   *  Without this, a host that adds/removes items between drags has
+   *  no path to trigger the container's render loop. */
+  private orderSyncListeners = new Set<() => void>();
 
   constructor(args: DndSourceArgs<T>) {
     this._getKey = args.getKey;
@@ -51,6 +58,15 @@ export class DndSource<T> {
     return () => this.changeListeners.delete(cb);
   }
 
+  /** Register a listener for host-driven order resyncs (`syncOrder`).
+   *  The container subscribes to this so external item changes — adds,
+   *  removes, host-driven reorders — trigger a re-render in the same
+   *  way internal commits do. */
+  onOrderSync(cb: () => void): () => void {
+    this.orderSyncListeners.add(cb);
+    return () => this.orderSyncListeners.delete(cb);
+  }
+
   /** Optimistic UI update — getOrder() will return the preview order. */
   _commitUI(txnId: TxnId): void {
     const txn = this.pendingTxns.get(txnId);
@@ -80,10 +96,16 @@ export class DndSource<T> {
 
   /** Sync cached order from external source (e.g. after host processes changes). */
   syncOrder(): void {
-    this.cachedOrder = [...this._getOrderFn()];
-    if (!this.previewOrder) {
-      // no pending preview, just update
+    const next = [...this._getOrderFn()];
+    if (orderEqual(this.cachedOrder, next)) return;
+    this.cachedOrder = next;
+    if (this.previewOrder) {
+      // A drag is in flight — preview wins until it commits/rolls
+      // back, but we've still updated cachedOrder so the post-commit
+      // state lines up with what the host now believes.
+      return;
     }
+    for (const cb of this.orderSyncListeners) cb();
   }
 
   private generateTxnId(): TxnId {
@@ -127,4 +149,12 @@ export class DndSource<T> {
       }
     }
   }
+}
+
+function orderEqual(a: readonly Key[], b: readonly Key[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
