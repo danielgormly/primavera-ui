@@ -15,6 +15,7 @@ Name | Type | Default
 | autoscroll-buffer | number | 32
 | autoscroll-height | number | 32
 | drag-stack-count | number | 3
+| expandable | boolean | false
 
 ## Web Component
 ```
@@ -280,6 +281,9 @@ When `drag-type='overlay'`, a full-page overlay captures pointer events and disp
 - `box-shadow` via `var(--dnd-drag-shadow)`.
 - Count badge is a direct child of the overlay (not a stack item) to avoid being clipped. It tracks the first stack item's position in the animation loop, anchored at top-right.
 - Grab offset: the stack anchors relative to the element that initiated the drag (not the first selected item). Compute `grabOffset = elementRect.topLeft - cursorPosition` at drag start and apply to all position updates.
+
+## Expansion
+When `expandable` is set, double-clicking an item toggles a single-item expanded state — the item's height is set to `auto` and a `ResizeObserver` feeds the measured content height into virtualization, pushing items below down by the difference. Escape collapses the open item, and starting a drag clears expansion (so all drag-mode math stays uniform-height).
 
 ## Touch devices (differences from mouse drag/select model)
 1. Multi-select is currently not possible on touch devices.
