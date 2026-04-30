@@ -9,6 +9,7 @@ import {
 } from "solid-js";
 import { render } from "solid-js/web";
 import { DndSource } from "../core/source";
+import { DndSelection } from "../core/selection";
 import { register } from "../index";
 import { PrimaveraDnd } from "../vanilla/container";
 import type { Key, DndOp, DndRenderer } from "../core/types";
@@ -38,6 +39,13 @@ export interface DndProps<T> {
   setItems?: (next: T[]) => void;
   onReorder?: (op: DndOp<T>) => void;
   getKey: (item: T) => Key;
+  /**
+   * Optional consumer-owned selection model. When provided, the consumer
+   * can mutate / observe selection from outside. Treated as a single-shot
+   * injection — swapping the prop after mount is not supported (same shape
+   * as `items`/source: re-mount the Dnd to swap).
+   */
+  selection?: DndSelection;
   itemHeight?: number;
   expandable?: boolean;
   overscan?: number;
@@ -116,6 +124,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     });
 
     el.setSource(source);
+    if (props.selection) el.setSelection(props.selection);
     el.setRenderer(renderer);
   });
 

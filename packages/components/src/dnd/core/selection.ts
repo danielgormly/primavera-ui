@@ -1,5 +1,7 @@
 import type { Key, Block, Selection } from "./types";
 
+type SelectionListener = (sel: DndSelection) => void;
+
 /**
  * Multi-block selection model with merge logic.
  *
@@ -17,8 +19,23 @@ export class DndSelection {
   /** Position → key (reverse of orderIndex). */
   private indexToKey: Key[] = [];
 
-  constructor(order: readonly Key[]) {
+  private listeners = new Set<SelectionListener>();
+
+  constructor(order: readonly Key[] = []) {
     this.updateOrder(order);
+  }
+
+  // ── Observers ───────────────────────────────────────────────────
+
+  onChange(cb: SelectionListener): () => void {
+    this.listeners.add(cb);
+    return () => {
+      this.listeners.delete(cb);
+    };
+  }
+
+  private notify(): void {
+    for (const cb of this.listeners) cb(this);
   }
 
   // ── Order management ────────────────────────────────────────────
@@ -82,6 +99,7 @@ export class DndSelection {
     const block: Block = { anchor: item, to: item };
     this.blocks = [block];
     this.active = block;
+    this.notify();
   }
 
   addBlock(item: Key): void {
@@ -89,6 +107,7 @@ export class DndSelection {
     this.blocks.push(block);
     this.active = block;
     this.merge();
+    this.notify();
   }
 
   extendActive(item: Key): void {
@@ -98,6 +117,7 @@ export class DndSelection {
     }
     this.active.to = item;
     this.merge();
+    this.notify();
   }
 
   toggleItem(item: Key): void {
@@ -106,6 +126,7 @@ export class DndSelection {
     } else {
       this.addBlock(item);
     }
+    this.notify();
   }
 
   moveSelection(dir: "up" | "down"): void {
@@ -130,6 +151,7 @@ export class DndSelection {
     }
 
     this.merge();
+    this.notify();
   }
 
   selectAll(): void {
@@ -140,11 +162,13 @@ export class DndSelection {
     };
     this.blocks = [block];
     this.active = block;
+    this.notify();
   }
 
   clear(): void {
     this.blocks = [];
     this.active = null;
+    this.notify();
   }
 
   // ── Relative identifiers ───────────────────────────────────────
@@ -249,6 +273,8 @@ export class DndSelection {
       }
       this.active = closest;
     }
+
+    this.notify();
   }
 
   private merge(): void {

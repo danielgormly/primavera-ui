@@ -45,6 +45,7 @@ export class PrimaveraDnd extends HTMLElement {
   private initialized = false;
   private resizeObserver: ResizeObserver | null = null;
   private sourceUnsub: (() => void) | null = null;
+  private selectionUnsub: (() => void) | null = null;
 
   // Drag state
   private isDragging = false;
@@ -132,16 +133,27 @@ export class PrimaveraDnd extends HTMLElement {
   setSource(source: DndSource<any>): void {
     if (this.sourceUnsub) this.sourceUnsub();
     this.source = source;
-    this.selection = new DndSelection(source.getOrder());
+    this.ensureSelection();
+    this.selection.updateOrder(source.getOrder());
 
     this.sourceUnsub = source.onChange(() => {
       this.selection.updateOrder(source.getOrder());
-      this.renderList();
+      if (this.initialized) this.renderList();
     });
 
     if (this.initialized) {
       this.renderList();
     }
+  }
+
+  setSelection(selection: DndSelection): void {
+    if (this.selectionUnsub) this.selectionUnsub();
+    this.selection = selection;
+    if (this.source) selection.updateOrder(this.source.getOrder());
+    this.selectionUnsub = selection.onChange(() => {
+      if (this.initialized) this.renderList();
+    });
+    if (this.initialized) this.renderList();
   }
 
   setRenderer(renderer: DndRenderer<any>): void {
@@ -155,6 +167,18 @@ export class PrimaveraDnd extends HTMLElement {
 
   getSelection() {
     return this.selection?.getSelection() ?? { blocks: [], active: null };
+  }
+
+  /**
+   * Lazily create an internal selection if the consumer hasn't injected one.
+   * Subscribes the new selection so its mutations trigger re-renders.
+   */
+  private ensureSelection(): void {
+    if (this.selection) return;
+    this.selection = new DndSelection();
+    this.selectionUnsub = this.selection.onChange(() => {
+      if (this.initialized) this.renderList();
+    });
   }
 
   // ── Init ────────────────────────────────────────────────────────
@@ -198,14 +222,16 @@ export class PrimaveraDnd extends HTMLElement {
     this.listbox.addEventListener("touchend", this.onTouchEnd);
     document.addEventListener("click", this.onDocumentClick);
 
-    // Init selection if source already set
+    // Ensure a selection exists (consumer may have injected one via
+    // setSelection, or setSource may have created one) so getSelection()
+    // and selection-touching event handlers are safe before any source is
+    // set.
+    this.ensureSelection();
     if (this.source) {
-      this.selection = new DndSelection(this.source.getOrder());
+      this.selection.updateOrder(this.source.getOrder());
       if (this.dragType === "native" && this.renderer) {
         this.dragNative = new DndDragNative(this.renderer);
       }
-    } else {
-      this.selection = new DndSelection([]);
     }
 
     this.initialized = true;
@@ -677,8 +703,9 @@ export class PrimaveraDnd extends HTMLElement {
         this.selection.clear();
         break;
     }
-
-    this.renderList();
+    // No explicit renderList — every case either mutates selection
+    // (selection.onChange → render) or applies an op to source
+    // (source.onChange → render).
   };
 
   private handleMoveSelection(dir: "up" | "down"): void {
@@ -760,8 +787,7 @@ export class PrimaveraDnd extends HTMLElement {
     } else if (!this.isDragging) {
       this.selection.selectOnly(key);
     }
-
-    this.renderList();
+    // No explicit renderList — selection.onChange triggers render.
   };
 
   private onDblClick = (e: MouseEvent): void => {
@@ -912,7 +938,6 @@ export class PrimaveraDnd extends HTMLElement {
     // If unselected, select it first
     if (!this.selection.isSelected(key)) {
       this.selection.selectOnly(key);
-      this.renderList();
     }
 
     this.mouseDownPos = { x: e.clientX, y: e.clientY };
@@ -1194,7 +1219,6 @@ export class PrimaveraDnd extends HTMLElement {
     switch (result.type) {
       case "select":
         this.selection.selectOnly(result.key);
-        this.renderList();
         break;
 
       case "drag-end":
@@ -1273,6 +1297,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.dragOverlay?.stop();
     this.touch?.cancel();
     if (this.sourceUnsub) this.sourceUnsub();
+    if (this.selectionUnsub) this.selectionUnsub();
     if (this.expandedObserver) {
       this.expandedObserver.disconnect();
       this.expandedObserver = null;
