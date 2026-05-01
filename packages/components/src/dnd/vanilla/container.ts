@@ -808,7 +808,16 @@ export class PrimaveraDnd extends HTMLElement {
     this.lastClickKey = key;
     this.lastClickTime = Date.now();
 
-    if (key === null) return;
+    if (key === null) {
+      // Click landed inside the listbox but not on an item — i.e. the buffer
+      // area below the last item when the listbox fills a taller parent. Treat
+      // it as a click-outside for clear-on-click-outside; the document-level
+      // handler can't catch this since the click is technically inside the host.
+      if (this.clearOnClickOutside && this.selection.hasSelection()) {
+        this.selection.clear();
+      }
+      return;
+    }
 
     const isMac =
       typeof navigator !== "undefined" &&
@@ -850,20 +859,31 @@ export class PrimaveraDnd extends HTMLElement {
   };
 
   private onDocumentClick = (e: MouseEvent): void => {
+    // Hit-test by coordinates, not DOM containment. A dismissable layer
+    // (e.g. a portaled context menu) commonly sets `pointer-events:none`
+    // on <body> while open, which routes the click to <html> — DOM
+    // containment then reports the click as outside even when the cursor
+    // was on top of us, spuriously firing clear-on-click-outside.
+    const insideHost = this.isPointInside(this, e.clientX, e.clientY);
     if (
       this.clearOnClickOutside &&
       this.selection.hasSelection() &&
-      !this.contains(e.target as Node)
+      !insideHost
     ) {
       this.selection.clear();
     }
     if (this.expandedKey === null) return;
     const expanded = this.renderedItems.get(this.expandedKey);
     if (!expanded) return;
-    if (!expanded.element.contains(e.target as Node)) {
+    if (!this.isPointInside(expanded.element, e.clientX, e.clientY)) {
       this.toggleExpanded(null);
     }
   };
+
+  private isPointInside(el: Element, x: number, y: number): boolean {
+    const r = el.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  }
 
   private toggleExpanded(key: Key | null): void {
     const next = key !== null && this.expandedKey !== key ? key : null;

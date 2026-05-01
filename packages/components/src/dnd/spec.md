@@ -310,6 +310,9 @@ A click anywhere outside the expanded item collapses it. When the user double-cl
 
 To recover the user's intent, every `click` snapshots the prior click's target and timestamp. In `dblclick`, if the snapshot is within the dblclick window (500ms — comfortably above the 0.15s shift animation), it is used as the target instead of the `dblclick` event's own target (which is typically the common ancestor of the two diverged clicks, or the second-clicked sibling).
 
+### Click-outside hit-testing
+Both `clear-on-click-outside` and the expanded-item collapse check use cursor coordinates against the relevant element's bounding rect, not DOM containment. A portaled dismissable layer (e.g. a context menu) commonly sets `pointer-events:none` on `<body>` while open, which routes the click event to `<html>` — DOM containment then reports the click as outside even when the cursor was on top of us, spuriously clearing selection or collapsing.
+
 ## Touch devices (differences from mouse drag/select model)
 1. Multi-select is currently not possible on touch devices.
 2. A tap constitutes select one behaviour.
