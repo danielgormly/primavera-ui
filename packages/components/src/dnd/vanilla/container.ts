@@ -124,6 +124,10 @@ export class PrimaveraDnd extends HTMLElement {
     return this.getAttribute("multi") !== "false";
   }
 
+  private get clearOnClickOutside(): boolean {
+    return this.hasAttribute("clear-on-click-outside");
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────
 
   connectedCallback(): void {
@@ -840,6 +844,13 @@ export class PrimaveraDnd extends HTMLElement {
   };
 
   private onDocumentClick = (e: MouseEvent): void => {
+    if (
+      this.clearOnClickOutside &&
+      this.selection.hasSelection() &&
+      !this.contains(e.target as Node)
+    ) {
+      this.selection.clear();
+    }
     if (this.expandedKey === null) return;
     const expanded = this.renderedItems.get(this.expandedKey);
     if (!expanded) return;

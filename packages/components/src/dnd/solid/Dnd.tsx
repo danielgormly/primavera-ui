@@ -31,6 +31,7 @@ declare module "solid-js" {
       "rounded-select": string;
       autofocus: string;
       multi: string;
+      "clear-on-click-outside": string;
     }
   }
 }
@@ -59,6 +60,9 @@ export interface DndProps<T> {
   /** When false, shift/cmd-click and shift+arrow keys collapse to
    *  single-select. Default true. */
   multi?: boolean;
+  /** When true, a click anywhere outside the Dnd element clears
+   *  selection. Default false. */
+  clearOnClickOutside?: boolean;
   dragType?: "native" | "overlay";
   class?: string;
   style?: JSX.CSSProperties | string;
@@ -167,6 +171,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       attr:rounded-select={String(props.roundedSelect ?? true)}
       attr:autofocus={props.autofocus ? "" : undefined}
       attr:multi={props.multi === false ? "false" : undefined}
+      attr:clear-on-click-outside={props.clearOnClickOutside ? "" : undefined}
     />
   );
 }

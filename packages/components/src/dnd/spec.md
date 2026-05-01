@@ -17,6 +17,7 @@ Name | Type | Default
 | drag-stack-count | number | 3
 | expandable | boolean | false
 | multi | boolean | true
+| clear-on-click-outside | boolean | false
 
 ## Web Component
 ```
