@@ -40,6 +40,9 @@ export interface DndProps<T> {
   items: T[];
   setItems?: (next: T[]) => void;
   onReorder?: (op: DndOp<T>) => void;
+  /** Receives the underlying `<primavera-dnd>` element for imperative calls
+   *  like `setExpanded(key)` / `getExpanded()` / `getSelection()`. */
+  ref?: (el: PrimaveraDnd) => void;
   getKey: (item: T) => Key;
   /**
    * Optional consumer-owned selection model. When provided, the consumer
@@ -134,6 +137,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     el.setSource(source);
     if (props.selection) el.setSelection(props.selection);
     el.setRenderer(renderer);
+    props.ref?.(el);
   });
 
   // External item changes — re-sync source order

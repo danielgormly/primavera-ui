@@ -188,6 +188,15 @@ export class PrimaveraDnd extends HTMLElement {
     return this.selection?.getSelection() ?? { blocks: [], active: null };
   }
 
+  /** Imperatively expand a key (or pass null to collapse). No-op if already in the requested state. */
+  setExpanded(key: Key | null): void {
+    this.applyExpanded(key);
+  }
+
+  getExpanded(): Key | null {
+    return this.expandedKey;
+  }
+
   /**
    * Lazily create an internal selection if the consumer hasn't injected one.
    * Subscribes the new selection so its mutations trigger re-renders.
@@ -645,7 +654,7 @@ export class PrimaveraDnd extends HTMLElement {
     // Escape collapses the expanded item before falling through to selection-clear
     if (e.key === "Escape" && this.expandedKey !== null) {
       e.preventDefault();
-      this.toggleExpanded(null);
+      this.applyExpanded(null);
       return;
     }
 
@@ -855,7 +864,7 @@ export class PrimaveraDnd extends HTMLElement {
     // Escape, click-outside, and drag start.
     if (key === this.expandedKey) return;
 
-    this.toggleExpanded(key);
+    this.applyExpanded(key);
   };
 
   private onDocumentClick = (e: MouseEvent): void => {
@@ -876,7 +885,7 @@ export class PrimaveraDnd extends HTMLElement {
     const expanded = this.renderedItems.get(this.expandedKey);
     if (!expanded) return;
     if (!this.isPointInside(expanded.element, e.clientX, e.clientY)) {
-      this.toggleExpanded(null);
+      this.applyExpanded(null);
     }
   };
 
@@ -885,8 +894,7 @@ export class PrimaveraDnd extends HTMLElement {
     return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
   }
 
-  private toggleExpanded(key: Key | null): void {
-    const next = key !== null && this.expandedKey !== key ? key : null;
+  private applyExpanded(next: Key | null): void {
     if (next === this.expandedKey) return;
 
     this.tearDownExpansion();
