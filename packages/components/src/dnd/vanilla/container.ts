@@ -286,7 +286,13 @@ export class PrimaveraDnd extends HTMLElement {
     this.listbox.setAttribute("role", "listbox");
     this.listbox.setAttribute("aria-multiselectable", String(this.multi));
     this.listbox.setAttribute("tabindex", "0");
-    this.listbox.style.cssText = "position:relative;outline:none;";
+    // `min-height:100%` lets the listbox fill a fixed-height parent (so the
+    // scroll viewport still has area during drag with many items hidden) while
+    // also letting the listbox — and thus an auto-height parent — shrink when
+    // items are removed. Doing this in JS via `max(contentHeight, parentH)`
+    // creates a feedback loop in auto-sized contexts: parentH is driven by the
+    // listbox, so once it grows it never shrinks.
+    this.listbox.style.cssText = "position:relative;outline:none;min-height:100%;";
 
     this.parent.appendChild(this.listbox);
     this.appendChild(this.parent);
@@ -331,7 +337,7 @@ export class PrimaveraDnd extends HTMLElement {
       const visualCount = this.collapsedOrder.length;
       const nudgeExtra = this.hoverIndex !== null && this.nudge ? 1 : 0;
       const contentHeight = this.virtualization.getTotalHeight(visualCount + nudgeExtra);
-      this.listbox.style.height = `${Math.max(contentHeight, this.parent.clientHeight)}px`;
+      this.listbox.style.height = `${Math.max(contentHeight, this.itemHeight)}px`;
 
       const newRange = this.virtualization.calculateRange(scrollTop, viewportHeight, visualCount);
 
@@ -371,7 +377,7 @@ export class PrimaveraDnd extends HTMLElement {
       this.currentRange = newRange;
     } else {
       const contentHeight = this.virtualization.getTotalHeight(order.length);
-      this.listbox.style.height = `${Math.max(contentHeight, this.parent.clientHeight)}px`;
+      this.listbox.style.height = `${Math.max(contentHeight, this.itemHeight)}px`;
 
       const newRange = this.virtualization.calculateRange(scrollTop, viewportHeight, order.length);
 
