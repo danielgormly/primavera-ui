@@ -68,9 +68,8 @@ export class DndVirtualization {
     return { startIndex, endIndex };
   }
 
-  /** Total scrollable height including 1-item buffer at end. */
   getTotalHeight(itemCount: number): number {
-    return (itemCount + 1) * this.itemHeight + this.delta;
+    return itemCount * this.itemHeight + this.delta;
   }
 
   /** Top position for an item at a given index. */
