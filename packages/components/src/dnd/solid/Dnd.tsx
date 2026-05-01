@@ -32,6 +32,7 @@ declare module "solid-js" {
       autofocus: string;
       multi: string;
       "clear-on-click-outside": string;
+      "fill-height": string;
     }
   }
 }
@@ -66,6 +67,11 @@ export interface DndProps<T> {
   /** When true, a click anywhere outside the Dnd element clears
    *  selection. Default false. */
   clearOnClickOutside?: boolean;
+  /** When true, the host fills its parent's height (the original behaviour:
+   *  host + scroll viewport are `height: 100%`, listbox `min-height: 100%`).
+   *  When false (default), the host collapses to content height — use this
+   *  inside auto-height parents so siblings stack cleanly underneath. */
+  fillHeight?: boolean;
   dragType?: "native" | "overlay";
   class?: string;
   style?: JSX.CSSProperties | string;
@@ -176,6 +182,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       attr:autofocus={props.autofocus ? "" : undefined}
       attr:multi={props.multi === false ? "false" : undefined}
       attr:clear-on-click-outside={props.clearOnClickOutside ? "" : undefined}
+      attr:fill-height={props.fillHeight ? "" : undefined}
     />
   );
 }

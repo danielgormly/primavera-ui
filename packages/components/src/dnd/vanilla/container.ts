@@ -128,6 +128,10 @@ export class PrimaveraDnd extends HTMLElement {
     return this.hasAttribute("clear-on-click-outside");
   }
 
+  private get fillHeight(): boolean {
+    return this.hasAttribute("fill-height");
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────
 
   connectedCallback(): void {
@@ -281,27 +285,27 @@ export class PrimaveraDnd extends HTMLElement {
   }
 
   private setupDOM(): void {
-    // The custom element itself is the positioning context
-    this.style.cssText = "position:relative;display:block;height:100%;";
+    const fill = this.fillHeight;
+
+    // The custom element itself is the positioning context. Without
+    // `fill-height`, leave height to the consumer / content so the host
+    // collapses inside auto-height parents instead of bleeding under siblings.
+    this.style.cssText = `position:relative;display:block;${fill ? "height:100%;" : ""}`;
 
     // Parent container (scroll viewport)
     this.parent = document.createElement("div");
     this.parent.className = "dnd-parent";
-    this.parent.style.cssText =
-      "position:relative;overflow-y:auto;height:100%;z-index:2;";
+    this.parent.style.cssText = `position:relative;overflow-y:auto;z-index:2;${fill ? "height:100%;" : ""}`;
 
     // Listbox
     this.listbox = document.createElement("div");
     this.listbox.setAttribute("role", "listbox");
     this.listbox.setAttribute("aria-multiselectable", String(this.multi));
     this.listbox.setAttribute("tabindex", "0");
-    // `min-height:100%` lets the listbox fill a fixed-height parent (so the
-    // scroll viewport still has area during drag with many items hidden) while
-    // also letting the listbox — and thus an auto-height parent — shrink when
-    // items are removed. Doing this in JS via `max(contentHeight, parentH)`
-    // creates a feedback loop in auto-sized contexts: parentH is driven by the
-    // listbox, so once it grows it never shrinks.
-    this.listbox.style.cssText = "position:relative;outline:none;min-height:100%;";
+    // In fill mode, `min-height:100%` keeps the scroll viewport populated
+    // during drag when many items are hidden by virtualization. In content
+    // mode the listbox just sizes to its explicit JS-set height.
+    this.listbox.style.cssText = `position:relative;outline:none;${fill ? "min-height:100%;" : ""}`;
 
     this.parent.appendChild(this.listbox);
     this.appendChild(this.parent);
@@ -346,7 +350,7 @@ export class PrimaveraDnd extends HTMLElement {
       const visualCount = this.collapsedOrder.length;
       const nudgeExtra = this.hoverIndex !== null && this.nudge ? 1 : 0;
       const contentHeight = this.virtualization.getTotalHeight(visualCount + nudgeExtra);
-      this.listbox.style.height = `${Math.max(contentHeight, this.itemHeight)}px`;
+      this.listbox.style.height = `${this.fillHeight ? Math.max(contentHeight, this.itemHeight) : contentHeight}px`;
 
       const newRange = this.virtualization.calculateRange(scrollTop, viewportHeight, visualCount);
 
@@ -386,7 +390,7 @@ export class PrimaveraDnd extends HTMLElement {
       this.currentRange = newRange;
     } else {
       const contentHeight = this.virtualization.getTotalHeight(order.length);
-      this.listbox.style.height = `${Math.max(contentHeight, this.itemHeight)}px`;
+      this.listbox.style.height = `${this.fillHeight ? Math.max(contentHeight, this.itemHeight) : contentHeight}px`;
 
       const newRange = this.virtualization.calculateRange(scrollTop, viewportHeight, order.length);
 
