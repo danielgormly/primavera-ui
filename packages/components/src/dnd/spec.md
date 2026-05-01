@@ -16,6 +16,7 @@ Name | Type | Default
 | autoscroll-height | number | 32
 | drag-stack-count | number | 3
 | expandable | boolean | false
+| multi | boolean | true
 
 ## Web Component
 ```
@@ -92,7 +93,7 @@ interface DragContext {
 ```
 <div class="consumer">
 	<div class="parent">
-		<div role="listbox" aria-multiselectable="true">
+		<div role="listbox" aria-multiselectable="{multi}">
 			...<div role="option" />
 		</div>
 		<div class="placeholder" />
@@ -232,6 +233,8 @@ TODO: macOS vs WINDOWS/Linux, not macOS vs Linux
 | `⌘+↑` | `ctrl+↑` | any | `moveSelection(up)` |
 | `⌘+a` | `ctrl+a` | any | `selectAll()` — single block from first to last |
 | `escape` | `escape` | any | `blocks = []; active = null` |
+
+When `multi` is `false`, the listbox is single-select: every multi-select gesture in the table above collapses to a single-selection equivalent. Specifically, `shift+click`, `shift+↓/↑`, `shift+⌘+↓/↑`, and `⌘/ctrl+click` all behave as `selectOnly(target)`; `⌘/ctrl+a` is a no-op. `aria-multiselectable` reflects this (`"true"` by default, `"false"` when `multi=false`).
 
 Every keyboard action that changes the selection or moves items must scroll the leading edge into view (e.g. top of selection when moving up, bottom when moving down).
 

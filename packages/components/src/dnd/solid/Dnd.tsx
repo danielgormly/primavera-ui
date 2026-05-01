@@ -30,6 +30,7 @@ declare module "solid-js" {
       nudge: string;
       "rounded-select": string;
       autofocus: string;
+      multi: string;
     }
   }
 }
@@ -55,6 +56,9 @@ export interface DndProps<T> {
   nudge?: boolean;
   roundedSelect?: boolean;
   autofocus?: boolean;
+  /** When false, shift/cmd-click and shift+arrow keys collapse to
+   *  single-select. Default true. */
+  multi?: boolean;
   dragType?: "native" | "overlay";
   class?: string;
   style?: JSX.CSSProperties | string;
@@ -162,6 +166,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       attr:nudge={String(props.nudge ?? true)}
       attr:rounded-select={String(props.roundedSelect ?? true)}
       attr:autofocus={props.autofocus ? "" : undefined}
+      attr:multi={props.multi === false ? "false" : undefined}
     />
   );
 }

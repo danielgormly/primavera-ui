@@ -118,6 +118,10 @@ export class PrimaveraDnd extends HTMLElement {
     return this.getAttribute("nudge") !== "false";
   }
 
+  private get multi(): boolean {
+    return this.getAttribute("multi") !== "false";
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────
 
   connectedCallback(): void {
@@ -258,7 +262,7 @@ export class PrimaveraDnd extends HTMLElement {
     // Listbox
     this.listbox = document.createElement("div");
     this.listbox.setAttribute("role", "listbox");
-    this.listbox.setAttribute("aria-multiselectable", "true");
+    this.listbox.setAttribute("aria-multiselectable", String(this.multi));
     this.listbox.setAttribute("tabindex", "0");
     this.listbox.style.cssText = "position:relative;outline:none;";
 
@@ -668,7 +672,8 @@ export class PrimaveraDnd extends HTMLElement {
             action.direction === "down"
               ? this.selection.next(activeBlock.to)
               : this.selection.prev(activeBlock.to);
-          this.selection.extendActive(target);
+          if (this.multi) this.selection.extendActive(target);
+          else this.selection.selectOnly(target);
           this.scrollToKey(target);
         } else {
           // No active — start from first/last
@@ -683,12 +688,14 @@ export class PrimaveraDnd extends HTMLElement {
       }
 
       case "extend-to-first":
-        this.selection.extendActive(this.selection.first());
+        if (this.multi) this.selection.extendActive(this.selection.first());
+        else this.selection.selectOnly(this.selection.first());
         this.scrollToKey(this.selection.first());
         break;
 
       case "extend-to-last":
-        this.selection.extendActive(this.selection.last());
+        if (this.multi) this.selection.extendActive(this.selection.last());
+        else this.selection.selectOnly(this.selection.last());
         this.scrollToKey(this.selection.last());
         break;
 
@@ -697,7 +704,7 @@ export class PrimaveraDnd extends HTMLElement {
         break;
 
       case "select-all":
-        this.selection.selectAll();
+        if (this.multi) this.selection.selectAll();
         break;
       case "clear":
         this.selection.clear();
@@ -780,9 +787,9 @@ export class PrimaveraDnd extends HTMLElement {
       /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
     const modKey = isMac ? e.metaKey : e.ctrlKey;
 
-    if (e.shiftKey) {
+    if (this.multi && e.shiftKey) {
       this.selection.extendActive(key);
-    } else if (modKey) {
+    } else if (this.multi && modKey) {
       this.selection.toggleItem(key);
     } else if (!this.isDragging) {
       this.selection.selectOnly(key);
