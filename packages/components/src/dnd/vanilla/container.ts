@@ -3,7 +3,7 @@ import { DndSource } from "../core/source";
 import { DndSelection } from "../core/selection";
 import { DndVirtualization, type VirtualRange } from "../core/virtualization";
 import { mapDndKeyEvent } from "../core/keyboard";
-import { DndCanvas } from "../dom/canvas";
+import { DndPlaceholder } from "../dom/placeholder";
 import { DndAutoscroll } from "../dom/autoscroll";
 import { DndDragOverlay } from "../dom/drag-overlay";
 import { DndDragNative } from "../dom/drag-native";
@@ -29,7 +29,7 @@ export class PrimaveraDnd extends HTMLElement {
   private renderer: DndRenderer<any> | null = null;
   private selection!: DndSelection;
   private virtualization!: DndVirtualization;
-  private canvas!: DndCanvas;
+  private placeholder!: DndPlaceholder;
   private autoscroll!: DndAutoscroll;
   private dragOverlay!: DndDragOverlay;
   private dragNative: DndDragNative<any> | null = null;
@@ -44,7 +44,6 @@ export class PrimaveraDnd extends HTMLElement {
   private renderedItems = new Map<Key, RenderedItem>();
   private currentRange: VirtualRange = { startIndex: 0, endIndex: 0 };
   private initialized = false;
-  private resizeObserver: ResizeObserver | null = null;
   private sourceUnsub: (() => void) | null = null;
   private sourceSyncUnsub: (() => void) | null = null;
   private selectionUnsub: (() => void) | null = null;
@@ -196,7 +195,7 @@ export class PrimaveraDnd extends HTMLElement {
   private init(): void {
     this.setupDOM();
     this.virtualization = new DndVirtualization(this.itemHeight, this.overscan);
-    this.canvas = new DndCanvas(this.itemHeight, BORDER_RADIUS_PX);
+    this.placeholder = new DndPlaceholder(this.itemHeight, BORDER_RADIUS_PX);
     this.autoscroll = new DndAutoscroll(
       this.parent,
       this.autoscrollBuffer,
@@ -205,17 +204,8 @@ export class PrimaveraDnd extends HTMLElement {
     this.dragOverlay = new DndDragOverlay(this.dragStackCount);
     this.touch = new DndTouch();
 
-    // Insert canvas as sibling of parent (outside scroll container)
-    this.appendChild(this.canvas.getElement());
-
-    // Resize observer for canvas
-    this.resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        this.canvas.resize(width, height);
-      }
-    });
-    this.resizeObserver.observe(this.parent);
+    // Insert placeholder as sibling of parent (outside scroll container)
+    this.appendChild(this.placeholder.getElement());
 
     // Events
     this.parent.addEventListener("scroll", this.onScroll, { passive: true });
@@ -1083,7 +1073,7 @@ export class PrimaveraDnd extends HTMLElement {
 
     this.dragOverlay.stop();
     this.autoscroll.stop();
-    this.canvas.clear();
+    this.placeholder.clear();
 
     if (!consumed && this.hoverIndex !== null && this.source) {
       // Compute the beforeKey from hoverIndex
@@ -1170,7 +1160,7 @@ export class PrimaveraDnd extends HTMLElement {
 
   private onNativeDragLeave = (): void => {
     this.hoverIndex = null;
-    this.canvas.clear();
+    this.placeholder.clear();
   };
 
   private onNativeDrop = (e: DragEvent): void => {
@@ -1195,7 +1185,7 @@ export class PrimaveraDnd extends HTMLElement {
       this.collapsedOrder = [];
       this.visualIndexMap.clear();
       this.listbox.style.overflow = "";
-      this.canvas.clear();
+      this.placeholder.clear();
       this.renderList();
     }
   };
@@ -1301,12 +1291,12 @@ export class PrimaveraDnd extends HTMLElement {
 
   private updatePlaceholder(): void {
     if (this.hoverIndex === null) {
-      this.canvas.clear();
+      this.placeholder.clear();
       return;
     }
 
     const y = this.hoverIndex * this.itemHeight - this.parent.scrollTop;
-    this.canvas.renderPlaceholder(y);
+    this.placeholder.renderPlaceholder(y);
   }
 
   // ── Helpers ─────────────────────────────────────────────────────
@@ -1337,7 +1327,6 @@ export class PrimaveraDnd extends HTMLElement {
     document.removeEventListener("click", this.onDocumentClick);
     document.removeEventListener("mousemove", this.onDocMouseMove);
     document.removeEventListener("mouseup", this.onDocMouseUp);
-    this.resizeObserver?.disconnect();
     this.autoscroll?.stop();
     if (this.scrollRaf !== null) cancelAnimationFrame(this.scrollRaf);
     this.dragOverlay?.stop();

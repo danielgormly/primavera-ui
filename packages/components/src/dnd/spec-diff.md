@@ -32,7 +32,7 @@ The gap is always exactly one `itemHeight`, regardless of how many items are bei
 
 **Important:** removing the nudge when the pointer leaves the parent is an *active* reset, not a skip. The render loop must always call the nudge function during drag — when `hoverIndex` is null, it resets all items to base positions. If nudge is only applied conditionally (e.g. `if hoverIndex !== null`), items will stay at their last nudged positions indefinitely.
 
-The canvas placeholder line is drawn at `hoverIndex * itemHeight - scrollTop`. When the pointer leaves the parent, both the placeholder and nudge offsets are removed.
+The placeholder div is positioned at `hoverIndex * itemHeight - scrollTop` via `transform: translateY(...)`. When the pointer leaves the parent, the placeholder fades out (opacity:0) and nudge offsets are reset.
 
 ## Virtualization during drag
 
@@ -58,26 +58,22 @@ Dragged items must be removed from the DOM (and the rendered item cache) at **dr
 
 At **drag end**, the render pass re-mounts them as fresh elements at their correct new position. Fresh mounts have no prior `top` to transition from, so there is no flash. This also avoids fragile transition-suppression hacks (`transition: none` + `requestAnimationFrame` restore) which can interfere with subsequent animations.
 
-## Canvas positioning and sizing
+## Placeholder positioning
 
-The canvas renders a placeholder rectangle showing where dragged items will land. Two layout constraints must be satisfied:
+The placeholder is a single absolutely-positioned div showing where dragged items will land. It draws at viewport-relative coordinates (`hoverIndex * itemHeight - scrollTop`). If the placeholder is a child of the scroll container, it scrolls with the content, causing it to drift as the user scrolls during drag.
 
-### Canvas must be outside the scroll container
-
-The canvas is positioned absolutely and draws at viewport-relative coordinates (`hoverIndex * itemHeight - scrollTop`). If the canvas is a child of the scroll container, it scrolls with the content, causing the placeholder to drift as the user scrolls during drag.
-
-**Fix:** the canvas is a sibling of the scroll container (`parent`), not a child. The custom element itself (`<primavera-dnd>`) is the positioning context (`position:relative; display:block`). The DOM structure is:
+**Fix:** the placeholder is a sibling of the scroll container (`parent`), not a child. The custom element itself (`<primavera-dnd>`) is the positioning context (`position:relative; display:block`). The DOM structure is:
 
 ```
 <primavera-dnd style="position:relative; display:block; height:100%">
   <div class="dnd-parent" style="overflow-y:auto; height:100%">
     <div role="listbox">...</div>
   </div>
-  <canvas style="position:absolute; top:0; left:0; z-index:1; pointer-events:none" />
+  <div class="placeholder" style="position:absolute; left:0; right:0; z-index:1; pointer-events:none" />
 </primavera-dnd>
 ```
 
-The canvas CSS dimensions are set explicitly via a `ResizeObserver` on the scroll container's `contentRect` (viewport size, not scroll height). This ensures the canvas covers exactly the visible area.
+`left:0; right:0` makes the placeholder auto-stretch to its positioning context, so no `ResizeObserver` is needed to track viewport size. Position is updated via `transform: translateY(...)` (GPU-composited, no reflow); show/hide is an `opacity` transition (0.15s) for smooth fade-in.
 
 ## Mouse event ordering: mousedown vs click
 
@@ -87,7 +83,7 @@ The canvas CSS dimensions are set explicitly via a `ResizeObserver` on the scrol
 
 ### Placeholder height matches item height
 
-The placeholder is a filled rectangle the full height of one item, not a thin line. The canvas must receive `itemHeight` and draw with `fillRect(0, y, canvasWidth, itemHeight)`. This gives clear visual feedback of the drop slot size.
+The placeholder is the full height of one item, not a thin line. `DndPlaceholder` receives `itemHeight` and sets it on the div, giving clear visual feedback of the drop slot size.
 
 ## Drag overlay: row container styling
 
