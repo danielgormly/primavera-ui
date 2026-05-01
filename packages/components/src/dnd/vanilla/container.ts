@@ -64,6 +64,8 @@ export class PrimaveraDnd extends HTMLElement {
   private expandedKey: Key | null = null;
   private measuredExpandedHeight = 0;
   private expandedObserver: ResizeObserver | null = null;
+  private parentResizeObserver: ResizeObserver | null = null;
+  private lastViewportHeight = 0;
 
   // Click pair tracking — when the first click of a dblclick triggers a
   // click-outside collapse, items below shift up and the second click can
@@ -225,6 +227,22 @@ export class PrimaveraDnd extends HTMLElement {
     });
     this.listbox.addEventListener("touchend", this.onTouchEnd);
     document.addEventListener("click", this.onDocumentClick);
+
+    // Re-render when the scroll viewport resizes — virtualization's
+    // visible range depends on parent.clientHeight, but layout often
+    // hasn't completed at connectedCallback time so the initial range
+    // can be too small (e.g. 0 viewport → only overscan items render).
+    // Without this, items beyond the initial range never mount until a
+    // scroll fires.
+    if (typeof ResizeObserver !== "undefined") {
+      this.parentResizeObserver = new ResizeObserver(() => {
+        const h = this.parent.clientHeight;
+        if (h === this.lastViewportHeight) return;
+        this.lastViewportHeight = h;
+        if (this.initialized && this.source) this.renderList();
+      });
+      this.parentResizeObserver.observe(this.parent);
+    }
 
     // Ensure a selection exists (consumer may have injected one via
     // setSelection, or setSource may have created one) so getSelection()
@@ -1344,6 +1362,10 @@ export class PrimaveraDnd extends HTMLElement {
     if (this.expandedObserver) {
       this.expandedObserver.disconnect();
       this.expandedObserver = null;
+    }
+    if (this.parentResizeObserver) {
+      this.parentResizeObserver.disconnect();
+      this.parentResizeObserver = null;
     }
     this.clearAllItems();
   }
