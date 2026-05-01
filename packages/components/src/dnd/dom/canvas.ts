@@ -8,6 +8,7 @@ export class DndCanvas {
 
   constructor(
     private itemHeight: number,
+    private borderRadius: number,
     private color = "var(--dnd-placeholder-color, #3b82f6)",
   ) {
     this.canvas = document.createElement("canvas");
@@ -46,7 +47,9 @@ export class DndCanvas {
 
     this.ctx.fillStyle = resolved;
     const canvasW = this.canvas.width / (window.devicePixelRatio || 1);
-    this.ctx.fillRect(0, y, canvasW, this.itemHeight);
+    this.ctx.beginPath();
+    this.ctx.roundRect(0, y, canvasW, this.itemHeight, this.borderRadius);
+    this.ctx.fill();
   }
 
   clear(): void {

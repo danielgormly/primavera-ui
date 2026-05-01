@@ -10,6 +10,7 @@ import { DndDragNative } from "../dom/drag-native";
 import { DndTouch } from "../dom/touch";
 
 const DRAG_BUFFER_PX = 3;
+const BORDER_RADIUS_PX = 4;
 
 interface RenderedItem {
   element: HTMLElement;
@@ -195,7 +196,7 @@ export class PrimaveraDnd extends HTMLElement {
   private init(): void {
     this.setupDOM();
     this.virtualization = new DndVirtualization(this.itemHeight, this.overscan);
-    this.canvas = new DndCanvas(this.itemHeight);
+    this.canvas = new DndCanvas(this.itemHeight, BORDER_RADIUS_PX);
     this.autoscroll = new DndAutoscroll(
       this.parent,
       this.autoscrollBuffer,
@@ -564,8 +565,8 @@ export class PrimaveraDnd extends HTMLElement {
     }
     this.styleEl.textContent = `
       ${base}
-      [data-sel-first] { border-top-left-radius: 4px; border-top-right-radius: 4px; }
-      [data-sel-last] { border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
+      [data-sel-first] { border-top-left-radius: ${BORDER_RADIUS_PX}px; border-top-right-radius: ${BORDER_RADIUS_PX}px; }
+      [data-sel-last] { border-bottom-left-radius: ${BORDER_RADIUS_PX}px; border-bottom-right-radius: ${BORDER_RADIUS_PX}px; }
     `;
   }
 
