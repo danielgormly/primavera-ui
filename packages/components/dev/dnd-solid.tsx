@@ -14,12 +14,14 @@ function App() {
 
   return (
     <Dnd
+      class="dnd-host"
       items={items()}
       setItems={setItems}
       getKey={(i) => i.id}
       itemHeight={40}
       expandable
       autofocus
+      fillHeight
     >
       {(item, expanded) => (
         <div style={{ padding: "8px 12px", "box-sizing": "border-box" }}>
@@ -28,7 +30,13 @@ function App() {
             <div style={{ "margin-top": "8px", color: "#666", "font-size": "13px" }}>
               <div>Expanded body for {item().label}.</div>
               <div>Double-click to collapse, or press Escape.</div>
-              <div>Items below are pushed down by the extra height.</div>
+              <div>
+                <input
+                  type="text"
+                  placeholder="Edit me, then drag this row"
+                  style={{ "margin-top": "6px", padding: "4px 6px", width: "100%" }}
+                />
+              </div>
             </div>
           )}
         </div>

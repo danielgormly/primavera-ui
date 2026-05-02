@@ -1,19 +1,17 @@
-import type { Key, DndOp, DndRenderer, DragContext } from "../core/types";
+import type { Key, DndRenderer } from "../core/types";
 import { DndSource } from "../core/source";
 import { DndSelection } from "../core/selection";
-import { DndVirtualization, type VirtualRange } from "../core/virtualization";
-import { mapDndKeyEvent } from "../core/keyboard";
-import { DndPlaceholder } from "../dom/placeholder";
-import { DndAutoscroll } from "../dom/autoscroll";
-import { DndDragOverlay } from "../dom/drag-overlay";
-import { DndDragNative } from "../dom/drag-native";
-import { DndTouch } from "../dom/touch";
+import {
+  DndController,
+  type DndControllerConfig,
+  type DndRenderItem,
+} from "../core/dnd-controller";
 
-const DRAG_BUFFER_PX = 3;
 const BORDER_RADIUS_PX = 4;
 
 interface RenderedItem {
   element: HTMLElement;
+  inner: HTMLElement;
   cleanup: () => void;
   index: number;
 }
@@ -22,59 +20,22 @@ interface RenderedItem {
  * <primavera-dnd> — Virtualized drag-and-drop list with multi-select.
  *
  * No Shadow DOM. Consumer provides a DndSource and DndRenderer.
+ *
+ * State and behaviour live in DndController; this element owns the structural
+ * DOM and per-item mounting via the renderer's mount/dispose protocol.
  */
 export class PrimaveraDnd extends HTMLElement {
-  // ── Subsystems ──────────────────────────────────────────────────
+  private controller: DndController | null = null;
   private source: DndSource<any> | null = null;
+  private pendingSelection: DndSelection | null = null;
   private renderer: DndRenderer<any> | null = null;
-  private selection!: DndSelection;
-  private virtualization!: DndVirtualization;
-  private placeholder!: DndPlaceholder;
-  private autoscroll!: DndAutoscroll;
-  private dragOverlay!: DndDragOverlay;
-  private dragNative: DndDragNative<any> | null = null;
-  private touch!: DndTouch;
 
-  // ── DOM ─────────────────────────────────────────────────────────
-  private parent!: HTMLElement;
+  private parentEl!: HTMLElement;
   private listbox!: HTMLElement;
   private styleEl!: HTMLStyleElement;
 
-  // ── State ───────────────────────────────────────────────────────
   private renderedItems = new Map<Key, RenderedItem>();
-  private currentRange: VirtualRange = { startIndex: 0, endIndex: 0 };
   private initialized = false;
-  private sourceUnsub: (() => void) | null = null;
-  private sourceSyncUnsub: (() => void) | null = null;
-  private selectionUnsub: (() => void) | null = null;
-
-  // Drag state
-  private isDragging = false;
-  private mouseDownPos: { x: number; y: number } | null = null;
-  private mouseDownKey: Key | null = null;
-  private hoverIndex: number | null = null;
-  private scrollRaf: number | null = null;
-  private lastPointerPos: { x: number; y: number } | null = null;
-  private draggedKeys: Key[] = [];
-  private dragSet: Set<Key> = new Set();
-  private collapsedOrder: Key[] = [];
-  private visualIndexMap = new Map<Key, number>();
-
-  // Expansion state (single item at a time)
-  private expandedKey: Key | null = null;
-  private measuredExpandedHeight = 0;
-  private expandedObserver: ResizeObserver | null = null;
-  private parentResizeObserver: ResizeObserver | null = null;
-  private lastViewportHeight = 0;
-
-  // Click pair tracking — when the first click of a dblclick triggers a
-  // click-outside collapse, items below shift up and the second click can
-  // hit a different element. onDblClick recovers the intended target by
-  // preferring the previous click within the dblclick window.
-  private lastClickKey: Key | null = null;
-  private lastClickTime = 0;
-  private prevClickKey: Key | null = null;
-  private prevClickTime = 0;
 
   // ── Attribute helpers ───────────────────────────────────────────
 
@@ -83,55 +44,42 @@ export class PrimaveraDnd extends HTMLElement {
       (this.getAttribute("drag-type") as "native" | "overlay") || "overlay"
     );
   }
-
   private get overscan(): number {
     return parseInt(this.getAttribute("overscan") || "2", 10);
   }
-
   private get roundedSelect(): boolean {
     return this.getAttribute("rounded-select") !== "false";
   }
-
   private get shouldAutofocus(): boolean {
     return this.hasAttribute("autofocus");
   }
-
   private get itemHeight(): number {
     return parseInt(this.getAttribute("item-height") || "32", 10);
   }
-
   private get expansionEnabled(): boolean {
     return this.hasAttribute("expandable");
   }
-
   private get confineAutoscroll(): boolean {
     return this.getAttribute("confine-autoscroll") !== "false";
   }
-
   private get autoscrollBuffer(): number {
     return parseInt(this.getAttribute("autoscroll-buffer") || "32", 10);
   }
-
   private get dragStackCount(): number {
     return parseInt(this.getAttribute("drag-stack-count") || "3", 10);
   }
-
   private get nudge(): boolean {
     return this.getAttribute("nudge") !== "false";
   }
-
   private get reorder(): boolean {
     return this.getAttribute("reorder") !== "false";
   }
-
   private get multi(): boolean {
     return this.getAttribute("multi") !== "false";
   }
-
   private get clearOnClickOutside(): boolean {
     return this.hasAttribute("clear-on-click-outside");
   }
-
   private get fillHeight(): boolean {
     return this.hasAttribute("fill-height");
   }
@@ -150,138 +98,93 @@ export class PrimaveraDnd extends HTMLElement {
   // ── Public API ──────────────────────────────────────────────────
 
   setSource(source: DndSource<any>): void {
-    if (this.sourceUnsub) this.sourceUnsub();
-    if (this.sourceSyncUnsub) this.sourceSyncUnsub();
     this.source = source;
-    this.ensureSelection();
-    this.selection.updateOrder(source.getOrder());
-
-    this.sourceUnsub = source.onChange(() => {
-      this.selection.updateOrder(source.getOrder());
-      if (this.initialized) this.renderList();
-    });
-    // Host-driven order resyncs (`source.syncOrder()`) — adds, removes,
-    // external reorders. Without this, host state changes update the
-    // source's `cachedOrder` but never reach the DOM.
-    this.sourceSyncUnsub = source.onOrderSync(() => {
-      this.selection.updateOrder(source.getOrder());
-      if (this.initialized) this.renderList();
-    });
-
-    if (this.initialized) {
-      this.renderList();
-    }
+    if (this.controller) this.controller.setSource(source);
   }
 
   setSelection(selection: DndSelection): void {
-    if (this.selectionUnsub) this.selectionUnsub();
-    this.selection = selection;
-    if (this.source) selection.updateOrder(this.source.getOrder());
-    this.selectionUnsub = selection.onChange(() => {
-      if (this.initialized) this.renderList();
-    });
-    if (this.initialized) this.renderList();
+    if (this.controller) this.controller.setSelection(selection);
+    else this.pendingSelection = selection;
   }
 
   setRenderer(renderer: DndRenderer<any>): void {
     this.renderer = renderer;
-    if (this.dragNative) this.dragNative.setRenderer(renderer);
-    if (this.initialized && this.source) {
+    if (this.controller) {
+      this.controller.setRenderer(renderer);
+      // Wipe and re-mount items with the new renderer
       this.clearAllItems();
       this.renderList();
     }
   }
 
   getSelection() {
-    return this.selection?.getSelection() ?? { blocks: [], active: null };
+    return this.controller?.getSelection() ?? { blocks: [], active: null };
   }
 
-  /** Imperatively expand a key (or pass null to collapse). No-op if already in the requested state. */
   setExpanded(key: Key | null): void {
-    this.applyExpanded(key);
+    this.controller?.setExpanded(key);
   }
 
   getExpanded(): Key | null {
-    return this.expandedKey;
-  }
-
-  /**
-   * Lazily create an internal selection if the consumer hasn't injected one.
-   * Subscribes the new selection so its mutations trigger re-renders.
-   */
-  private ensureSelection(): void {
-    if (this.selection) return;
-    this.selection = new DndSelection();
-    this.selectionUnsub = this.selection.onChange(() => {
-      if (this.initialized) this.renderList();
-    });
+    return this.controller?.getExpanded() ?? null;
   }
 
   // ── Init ────────────────────────────────────────────────────────
 
   private init(): void {
     this.setupDOM();
-    this.virtualization = new DndVirtualization(this.itemHeight, this.overscan);
-    this.placeholder = new DndPlaceholder(this.itemHeight, BORDER_RADIUS_PX);
-    this.autoscroll = new DndAutoscroll(
-      this.parent,
-      this.autoscrollBuffer,
-      this.confineAutoscroll,
-    );
-    this.dragOverlay = new DndDragOverlay(this.dragStackCount);
-    this.touch = new DndTouch();
 
-    // Insert placeholder as sibling of parent (outside scroll container)
-    this.appendChild(this.placeholder.getElement());
+    const config: DndControllerConfig = {
+      itemHeight: this.itemHeight,
+      overscan: this.overscan,
+      dragType: this.dragType,
+      roundedSelect: this.roundedSelect,
+      expansionEnabled: this.expansionEnabled,
+      confineAutoscroll: this.confineAutoscroll,
+      autoscrollBuffer: this.autoscrollBuffer,
+      dragStackCount: this.dragStackCount,
+      nudge: this.nudge,
+      reorder: this.reorder,
+      multi: this.multi,
+      clearOnClickOutside: this.clearOnClickOutside,
+      fillHeight: this.fillHeight,
+    };
 
-    // Events
-    this.parent.addEventListener("scroll", this.onScroll, { passive: true });
-    this.listbox.addEventListener("keydown", this.onKeyDown);
-    this.listbox.addEventListener("mousedown", this.onMouseDown);
-    this.listbox.addEventListener("click", this.onClick);
-    this.listbox.addEventListener("dblclick", this.onDblClick);
-    this.listbox.addEventListener("touchstart", this.onTouchStart, {
-      passive: false,
+    this.controller = new DndController({
+      config,
+      host: { host: this, parent: this.parentEl, listbox: this.listbox },
+      onChange: () => this.renderList(),
+      getItemElement: (key) => this.renderedItems.get(key)?.element ?? null,
+      getItemInnerElement: (key) => this.renderedItems.get(key)?.inner ?? null,
     });
-    this.listbox.addEventListener("touchmove", this.onTouchMove, {
-      passive: false,
-    });
-    this.listbox.addEventListener("touchend", this.onTouchEnd);
-    document.addEventListener("click", this.onDocumentClick);
 
-    // Re-render when the scroll viewport resizes — virtualization's
-    // visible range depends on parent.clientHeight, but layout often
-    // hasn't completed at connectedCallback time so the initial range
-    // can be too small (e.g. 0 viewport → only overscan items render).
-    // Without this, items beyond the initial range never mount until a
-    // scroll fires.
-    if (typeof ResizeObserver !== "undefined") {
-      this.parentResizeObserver = new ResizeObserver(() => {
-        const h = this.parent.clientHeight;
-        if (h === this.lastViewportHeight) return;
-        this.lastViewportHeight = h;
-        if (this.initialized && this.source) this.renderList();
-      });
-      this.parentResizeObserver.observe(this.parent);
+    if (this.pendingSelection) {
+      this.controller.setSelection(this.pendingSelection);
+      this.pendingSelection = null;
     }
 
-    // Ensure a selection exists (consumer may have injected one via
-    // setSelection, or setSource may have created one) so getSelection()
-    // and selection-touching event handlers are safe before any source is
-    // set.
-    this.ensureSelection();
-    if (this.source) {
-      this.selection.updateOrder(this.source.getOrder());
-      if (this.dragType === "native" && this.renderer) {
-        this.dragNative = new DndDragNative(this.renderer);
-      }
-    }
+    // Wire events
+    this.parentEl.addEventListener("scroll", this.controller.onScroll, {
+      passive: true,
+    });
+    this.listbox.addEventListener("keydown", this.controller.onKeyDown);
+    this.listbox.addEventListener("mousedown", this.controller.onMouseDown);
+    this.listbox.addEventListener("click", this.controller.onClick);
+    this.listbox.addEventListener("dblclick", this.controller.onDblClick);
+    this.listbox.addEventListener("touchstart", this.controller.onTouchStart, {
+      passive: false,
+    });
+    this.listbox.addEventListener("touchmove", this.controller.onTouchMove, {
+      passive: false,
+    });
+    this.listbox.addEventListener("touchend", this.controller.onTouchEnd);
 
     this.initialized = true;
 
-    if (this.source) {
-      this.renderList();
-    }
+    if (this.source) this.controller.setSource(this.source);
+    if (this.renderer) this.controller.setRenderer(this.renderer);
+
+    this.renderList();
 
     if (this.shouldAutofocus) {
       queueMicrotask(() => this.listbox.focus());
@@ -290,279 +193,138 @@ export class PrimaveraDnd extends HTMLElement {
 
   private setupDOM(): void {
     const fill = this.fillHeight;
-
-    // The custom element itself is the positioning context. Without
-    // `fill-height`, leave height to the consumer / content so the host
-    // collapses inside auto-height parents instead of bleeding under siblings.
     this.style.cssText = `position:relative;display:block;${fill ? "height:100%;" : ""}`;
 
-    // Parent container (scroll viewport)
-    this.parent = document.createElement("div");
-    this.parent.className = "dnd-parent";
-    this.parent.style.cssText = `position:relative;overflow-y:auto;z-index:2;${fill ? "height:100%;" : ""}`;
+    this.parentEl = document.createElement("div");
+    this.parentEl.className = "dnd-parent";
+    this.parentEl.style.cssText = `position:relative;overflow-y:auto;z-index:2;${fill ? "height:100%;" : ""}`;
 
-    // Listbox
     this.listbox = document.createElement("div");
     this.listbox.setAttribute("role", "listbox");
     this.listbox.setAttribute("aria-multiselectable", String(this.multi));
     this.listbox.setAttribute("tabindex", "0");
-    // In fill mode, `min-height:100%` keeps the scroll viewport populated
-    // during drag when many items are hidden by virtualization. In content
-    // mode the listbox just sizes to its explicit JS-set height.
     this.listbox.style.cssText = `position:relative;outline:none;${fill ? "min-height:100%;" : ""}`;
 
-    this.parent.appendChild(this.listbox);
-    this.appendChild(this.parent);
+    this.parentEl.appendChild(this.listbox);
+    this.appendChild(this.parentEl);
 
-    // Style element for rounded selection
     this.styleEl = document.createElement("style");
     this.appendChild(this.styleEl);
-    this.updateRoundedSelectStyles();
+    this.updateStyles();
   }
 
   // ── Rendering ───────────────────────────────────────────────────
 
   private renderList(): void {
-    if (!this.source || !this.renderer) return;
+    if (!this.controller || !this.source || !this.renderer) return;
 
-    const order = this.source.getOrder();
-    this.selection.updateOrder(order);
+    const state = this.controller.getRenderState();
 
-    // Sync expanded state into virtualization. Expansion is suppressed
-    // during drag so collapsed-order math stays uniform-height.
-    let expandedIndex: number | null = null;
-    if (!this.isDragging && this.expandedKey !== null) {
-      const idx = order.indexOf(this.expandedKey);
-      if (idx === -1) {
-        // Expanded item was removed from source — clear it.
-        this.tearDownExpansion();
+    this.listbox.style.height = `${state.listboxHeight}px`;
+
+    const keysToRender = new Set<Key>();
+    for (const it of state.items) keysToRender.add(it.key);
+
+    // Remove items no longer in the visible set. Vanilla path tears down
+    // dragged items at drag start because they're not in items[] (they're
+    // in keepAlive[], which vanilla deliberately ignores) — calling cleanup()
+    // releases per-item framework roots to avoid the leak that the unified
+    // architecture is designed to make impossible at the Solid layer.
+    for (const [key, item] of this.renderedItems) {
+      if (!keysToRender.has(key)) {
+        item.cleanup();
+        item.element.remove();
+        this.renderedItems.delete(key);
+      }
+    }
+
+    for (const it of state.items) {
+      const existing = this.renderedItems.get(it.key);
+      if (existing) {
+        this.updateItem(existing, it);
       } else {
-        expandedIndex = idx;
+        this.mountItem(it);
       }
     }
-    this.virtualization.setExpanded(
-      expandedIndex,
-      this.measuredExpandedHeight || this.itemHeight,
-    );
 
-    const scrollTop = this.parent.scrollTop;
-    const viewportHeight = this.parent.clientHeight;
-    const selectedKeys = new Set(this.selection.getSelectedKeys());
-
-    if (this.isDragging) {
-      // Use pre-computed collapsed order for virtualization during drag
-      const visualCount = this.collapsedOrder.length;
-      const nudgeExtra = this.reorder && this.hoverIndex !== null && this.nudge ? 1 : 0;
-      const contentHeight = this.virtualization.getTotalHeight(visualCount + nudgeExtra);
-      this.listbox.style.height = `${this.fillHeight ? Math.max(contentHeight, this.itemHeight) : contentHeight}px`;
-
-      const newRange = this.virtualization.calculateRange(scrollTop, viewportHeight, visualCount);
-
-      const keysToRender = new Set<Key>();
-      for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
-        if (i < visualCount) keysToRender.add(this.collapsedOrder[i]);
-      }
-
-      // Remove items no longer in range (keep dragged items cached)
-      for (const [key, item] of this.renderedItems) {
-        if (!keysToRender.has(key) && !this.dragSet.has(key)) {
-          if (key === this.expandedKey && this.expandedObserver) {
-            this.expandedObserver.disconnect();
-            this.expandedObserver = null;
-          }
-          item.cleanup();
-          item.element.remove();
-          this.renderedItems.delete(key);
-        }
-      }
-
-      // Add/update visible collapsed items
-      for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
-        if (i >= visualCount) break;
-        const key = this.collapsedOrder[i];
-        const fullIndex = order.indexOf(key);
-        const existing = this.renderedItems.get(key);
-        if (existing) {
-          this.updateItemPosition(existing, i, key);
-          this.updateItemSelection(existing, key, fullIndex, order, selectedKeys);
-        } else {
-          this.mountItem(key, i, order, selectedKeys);
-        }
-      }
-
-      if (this.nudge) this.applyNudge();
-      this.currentRange = newRange;
-    } else {
-      const contentHeight = this.virtualization.getTotalHeight(order.length);
-      this.listbox.style.height = `${this.fillHeight ? Math.max(contentHeight, this.itemHeight) : contentHeight}px`;
-
-      const newRange = this.virtualization.calculateRange(scrollTop, viewportHeight, order.length);
-
-      const keysToRender = new Set<Key>();
-      for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
-        if (i < order.length) keysToRender.add(order[i]);
-      }
-
-      for (const [key, item] of this.renderedItems) {
-        if (!keysToRender.has(key)) {
-          if (key === this.expandedKey && this.expandedObserver) {
-            this.expandedObserver.disconnect();
-            this.expandedObserver = null;
-          }
-          item.cleanup();
-          item.element.remove();
-          this.renderedItems.delete(key);
-        }
-      }
-
-      for (let i = newRange.startIndex; i < newRange.endIndex; i++) {
-        if (i >= order.length) break;
-        const key = order[i];
-        const existing = this.renderedItems.get(key);
-        if (existing) {
-          this.updateItemPosition(existing, i, key);
-          this.updateItemSelection(existing, key, i, order, selectedKeys);
-        } else {
-          this.mountItem(key, i, order, selectedKeys);
-        }
-      }
-
-      this.currentRange = newRange;
-    }
+    // After items are mounted, hand DOM refs to controller so it can wire
+    // the expansion observer to the (possibly re-mounted) inner element.
+    this.controller.syncExpansionObserver();
   }
 
-  private mountItem(
-    key: Key,
-    index: number,
-    order: readonly Key[],
-    selectedKeys: Set<Key>,
-  ): void {
+  private mountItem(state: DndRenderItem): void {
     if (!this.renderer || !this.source) return;
-    const item = this.source.getItem(key);
+    const item = this.source.getItem(state.key);
     if (item === undefined) return;
 
     const container = document.createElement("div");
     container.className = "dnd-item";
     container.setAttribute("role", "option");
-    container.dataset.key = String(key);
-    const isExpanded = key === this.expandedKey;
-    const initialHeight = isExpanded
-      ? this.measuredExpandedHeight || this.itemHeight
-      : this.itemHeight;
-    container.style.top = `${this.virtualization.getItemTop(index)}px`;
-    container.style.height = `${initialHeight}px`;
+    container.dataset.key = String(state.key);
+    container.style.top = `${state.top}px`;
+    container.style.height = `${state.height}px`;
 
-    // Inner wrapper fills the container when collapsed so consumer
-    // content can size with `height: 100%`. When expanded (data-expanded),
-    // it switches to natural height so the ResizeObserver in
-    // attachExpandedObserver can drive the outer's animated height.
     const inner = document.createElement("div");
     inner.className = "dnd-item-inner";
-    if (isExpanded) inner.dataset.expanded = "";
+    if (state.expanded) inner.dataset.expanded = "";
     container.appendChild(inner);
 
-    // Native drag mode
     if (this.dragType === "native") {
       container.draggable = true;
       container.addEventListener("dragstart", (e) =>
-        this.onNativeDragStart(e, key),
+        this.controller!.onNativeDragStart(e, state.key),
       );
-      container.addEventListener("dragend", () => this.onNativeDragEnd());
+      container.addEventListener("dragend", () =>
+        this.controller!.onNativeDragEnd(),
+      );
     }
 
-    this.updateItemSelection(
-      { element: container, cleanup: () => {}, index },
-      key,
-      index,
-      order,
-      selectedKeys,
-    );
+    this.applyItemSelectionAttrs(container, state);
 
-    const cleanup = this.renderer.mount(key, item, inner);
+    const cleanup = this.renderer.mount(state.key, item, inner);
     this.listbox.appendChild(container);
-    this.renderedItems.set(key, { element: container, cleanup, index });
 
-    // Re-mount of an already-expanded item (e.g. scrolled back into view):
-    // re-attach observer so we keep tracking its content height.
-    if (isExpanded && !this.expandedObserver) {
-      this.attachExpandedObserver(container);
-    }
+    this.renderedItems.set(state.key, {
+      element: container,
+      inner,
+      cleanup,
+      index: state.index,
+    });
   }
 
-  private updateItemPosition(
-    item: RenderedItem,
-    index: number,
-    key: Key,
-  ): void {
-    item.element.style.top = `${this.virtualization.getItemTop(index)}px`;
-    if (key !== this.expandedKey) {
-      item.element.style.height = `${this.itemHeight}px`;
-    }
-    item.index = index;
-  }
+  private updateItem(existing: RenderedItem, state: DndRenderItem): void {
+    existing.element.style.top = `${state.top}px`;
+    // Don't clobber the expanded item's animated height while it's animating
+    // open/close — virtualization owns its target height via getRenderState
+    // and ResizeObserver feeds back the live measurement.
+    existing.element.style.height = `${state.height}px`;
+    existing.index = state.index;
 
-  private updateItemSelection(
-    item: RenderedItem,
-    key: Key,
-    index: number,
-    order: readonly Key[],
-    selectedKeys: Set<Key>,
-  ): void {
-    // While anything is expanded, selection chrome is suppressed everywhere —
-    // the expanded item is the visual focus and should not also wear select chrome.
-    const isSelected = this.expandedKey === null && selectedKeys.has(key);
-    item.element.setAttribute("aria-selected", String(isSelected));
-
-    if (isSelected) {
-      item.element.dataset.selected = "";
-
-      if (this.roundedSelect) {
-        const prevKey = index > 0 ? order[index - 1] : null;
-        const nextKey =
-          index < order.length - 1 ? order[index + 1] : null;
-        const isFirst = !prevKey || !selectedKeys.has(prevKey);
-        const isLast = !nextKey || !selectedKeys.has(nextKey);
-        item.element.dataset.selFirst = isFirst ? "" : undefined!;
-        item.element.dataset.selLast = isLast ? "" : undefined!;
-        if (!isFirst) delete item.element.dataset.selFirst;
-        if (!isLast) delete item.element.dataset.selLast;
-      }
+    if (state.expanded) {
+      existing.inner.dataset.expanded = "";
     } else {
-      delete item.element.dataset.selected;
-      delete item.element.dataset.selFirst;
-      delete item.element.dataset.selLast;
+      delete existing.inner.dataset.expanded;
     }
 
-
+    this.applyItemSelectionAttrs(existing.element, state);
   }
 
-  private rebuildCollapsedOrder(): void {
-    const order = this.source!.getOrder();
-    this.collapsedOrder = [];
-    this.visualIndexMap.clear();
-    for (const key of order) {
-      if (!this.dragSet.has(key)) {
-        this.visualIndexMap.set(key, this.collapsedOrder.length);
-        this.collapsedOrder.push(key);
-      }
+  private applyItemSelectionAttrs(
+    el: HTMLElement,
+    state: DndRenderItem,
+  ): void {
+    el.setAttribute("aria-selected", String(state.selected));
+    if (state.selected) {
+      el.dataset.selected = "";
+    } else {
+      delete el.dataset.selected;
     }
+    if (state.selFirst) el.dataset.selFirst = "";
+    else delete el.dataset.selFirst;
+    if (state.selLast) el.dataset.selLast = "";
+    else delete el.dataset.selLast;
   }
 
-  private applyNudge(): void {
-    if (!this.reorder) return;
-    const nudgeAmount = this.itemHeight;
-    for (const [key, item] of this.renderedItems) {
-      if (this.dragSet.has(key)) continue;
-      const visualIdx = this.visualIndexMap.get(key);
-      if (visualIdx === undefined) continue;
-      const baseTop = visualIdx * this.itemHeight;
-      if (this.hoverIndex !== null && visualIdx >= this.hoverIndex) {
-        item.element.style.top = `${baseTop + nudgeAmount}px`;
-      } else {
-        item.element.style.top = `${baseTop}px`;
-      }
-    }
-  }
   private clearAllItems(): void {
     for (const [, item] of this.renderedItems) {
       item.cleanup();
@@ -571,14 +333,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.renderedItems.clear();
   }
 
-  private updateRoundedSelectStyles(): void {
-    // Item containers and their inner wrappers carry only dynamic
-    // top/height inline; the static positioning lives here so consumer
-    // dev tools stay legible. The inner fills the container by default
-    // (so a row with `height: 100%` resolves correctly); the expanded
-    // item gets `data-expanded` to release `bottom` so the inner can
-    // grow to its natural content height — that's what feeds the
-    // ResizeObserver in attachExpandedObserver().
+  private updateStyles(): void {
     const base = `
       .dnd-item {
         position: absolute;
@@ -610,821 +365,20 @@ export class PrimaveraDnd extends HTMLElement {
     `;
   }
 
-  // ── Scroll ──────────────────────────────────────────────────────
-
-  private onScroll = (): void => {
-    this.renderList();
-
-    // Recalculate hover index and placeholder during drag (scrollTop changed)
-    if (this.isDragging) {
-      this.updateHoverIndex();
-      this.updatePlaceholder();
-      if (this.nudge) this.applyNudge();
-    }
-  };
-
-  /** Smoothly scroll to bring a key into view. */
-  private scrollToKey(key: Key): void {
-    if (!this.source) return;
-    const order = this.source.getOrder();
-    const idx = order.indexOf(key);
-    if (idx === -1) return;
-
-    const offset = this.virtualization.getScrollToOffset(
-      idx,
-      this.parent.scrollTop,
-      this.parent.clientHeight,
-    );
-    if (offset !== null) {
-      this.smoothScrollTo(offset);
-    }
-  }
-
-  private smoothScrollTo(target: number): void {
-    if (this.scrollRaf !== null) cancelAnimationFrame(this.scrollRaf);
-    const step = () => {
-      const diff = target - this.parent.scrollTop;
-      if (Math.abs(diff) < 1) {
-        this.parent.scrollTop = target;
-        this.scrollRaf = null;
-        return;
-      }
-      this.parent.scrollTop += diff * 0.35;
-      this.scrollRaf = requestAnimationFrame(step);
-    };
-    this.scrollRaf = requestAnimationFrame(step);
-  }
-
-  // ── Keyboard ────────────────────────────────────────────────────
-
-  private onKeyDown = (e: KeyboardEvent): void => {
-    if (!this.source) return;
-
-    // Escape collapses the expanded item before falling through to selection-clear
-    if (e.key === "Escape" && this.expandedKey !== null) {
-      e.preventDefault();
-      this.applyExpanded(null);
-      return;
-    }
-
-    const action = mapDndKeyEvent(e);
-    if (action.type === "ignore") return;
-
-    e.preventDefault();
-    const order = this.source.getOrder();
-
-    switch (action.type) {
-      case "select-only-first":
-        this.selection.selectOnly(this.selection.first());
-        this.scrollToKey(this.selection.first());
-        break;
-
-      case "select-only-last":
-        this.selection.selectOnly(this.selection.last());
-        this.scrollToKey(this.selection.last());
-        break;
-
-      case "navigate": {
-        if (!this.selection.hasSelection()) {
-          const key =
-            action.direction === "down"
-              ? order[0]
-              : order[order.length - 1];
-          if (key !== undefined) {
-            this.selection.selectOnly(key);
-            this.scrollToKey(key);
-          }
-        } else {
-          const ref =
-            action.direction === "down"
-              ? this.selection.getSelectionBottom()
-              : this.selection.getSelectionTop();
-          if (ref !== null) {
-            const target =
-              action.direction === "down"
-                ? this.selection.next(ref)
-                : this.selection.prev(ref);
-            this.selection.selectOnly(target);
-            this.scrollToKey(target);
-          }
-        }
-        break;
-      }
-
-      case "extend": {
-        const activeBlock = this.selection.getActiveBlock();
-        if (activeBlock !== null) {
-          const target =
-            action.direction === "down"
-              ? this.selection.next(activeBlock.to)
-              : this.selection.prev(activeBlock.to);
-          if (this.multi) this.selection.extendActive(target);
-          else this.selection.selectOnly(target);
-          this.scrollToKey(target);
-        } else {
-          // No active — start from first/last
-          const key =
-            action.direction === "down" ? order[0] : order[order.length - 1];
-          if (key !== undefined) {
-            this.selection.selectOnly(key);
-            this.scrollToKey(key);
-          }
-        }
-        break;
-      }
-
-      case "extend-to-first":
-        if (this.multi) this.selection.extendActive(this.selection.first());
-        else this.selection.selectOnly(this.selection.first());
-        this.scrollToKey(this.selection.first());
-        break;
-
-      case "extend-to-last":
-        if (this.multi) this.selection.extendActive(this.selection.last());
-        else this.selection.selectOnly(this.selection.last());
-        this.scrollToKey(this.selection.last());
-        break;
-
-      case "move-selection":
-        if (this.reorder) this.handleMoveSelection(action.direction);
-        break;
-
-      case "select-all":
-        if (this.multi) this.selection.selectAll();
-        break;
-      case "clear":
-        this.selection.clear();
-        break;
-    }
-    // No explicit renderList — every case either mutates selection
-    // (selection.onChange → render) or applies an op to source
-    // (source.onChange → render).
-  };
-
-  private handleMoveSelection(dir: "up" | "down"): void {
-    if (!this.source || !this.selection.hasSelection()) return;
-
-    const selectedKeys = this.selection.getSelectedKeys();
-    const order = this.source.getOrder();
-
-    // Calculate where to move
-    const keySet = new Set(selectedKeys);
-    const filtered = order.filter((k) => !keySet.has(k));
-
-    // Find insertion point
-    const topKey = this.selection.getSelectionTop()!;
-    const topIdx = order.indexOf(topKey);
-    const bottomKey = this.selection.getSelectionBottom()!;
-    const bottomIdx = order.indexOf(bottomKey);
-
-    let beforeKey: Key | null;
-    if (dir === "up") {
-      if (topIdx <= 0) return;
-      // Find the key that was just above the selection
-      const aboveKey = order[topIdx - 1];
-      if (keySet.has(aboveKey)) return;
-      const aboveIdxInFiltered = filtered.indexOf(aboveKey);
-      beforeKey = aboveIdxInFiltered >= 0 ? filtered[aboveIdxInFiltered] : null;
-    } else {
-      if (bottomIdx >= order.length - 1) return;
-      const belowKey = order[bottomIdx + 1];
-      if (keySet.has(belowKey)) return;
-      const belowIdxInFiltered = filtered.indexOf(belowKey);
-      beforeKey =
-        belowIdxInFiltered + 1 < filtered.length
-          ? filtered[belowIdxInFiltered + 1]
-          : null;
-    }
-
-    const txnId = this.source.apply([
-      { type: "move", keys: selectedKeys, beforeKey },
-    ]);
-    this.source._commitUI(txnId);
-    this.source._commitState(txnId);
-
-    // Update selection to new positions
-    this.selection.updateOrder(this.source.getOrder());
-
-    // Scroll to the leading edge of the moved selection
-    const scrollTarget =
-      dir === "up"
-        ? this.selection.getSelectionTop()
-        : this.selection.getSelectionBottom();
-    if (scrollTarget !== null) this.scrollToKey(scrollTarget);
-  }
-
-  // ── Mouse ───────────────────────────────────────────────────────
-
-  private onClick = (e: MouseEvent): void => {
-    if (!this.source) return;
-
-    const key = this.getKeyFromEvent(e);
-
-    // Snapshot prior click for dblclick target recovery (see onDblClick).
-    this.prevClickKey = this.lastClickKey;
-    this.prevClickTime = this.lastClickTime;
-    this.lastClickKey = key;
-    this.lastClickTime = Date.now();
-
-    if (key === null) {
-      // Click landed inside the listbox but not on an item — i.e. the buffer
-      // area below the last item when the listbox fills a taller parent. Treat
-      // it as a click-outside for clear-on-click-outside; the document-level
-      // handler can't catch this since the click is technically inside the host.
-      if (this.clearOnClickOutside && this.selection.hasSelection()) {
-        this.selection.clear();
-      }
-      return;
-    }
-
-    const isMac =
-      typeof navigator !== "undefined" &&
-      /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
-    const modKey = isMac ? e.metaKey : e.ctrlKey;
-
-    if (this.multi && e.shiftKey) {
-      this.selection.extendActive(key);
-    } else if (this.multi && modKey) {
-      this.selection.toggleItem(key);
-    } else if (!this.isDragging) {
-      this.selection.selectOnly(key);
-    }
-    // No explicit renderList — selection.onChange triggers render.
-  };
-
-  private onDblClick = (e: MouseEvent): void => {
-    if (!this.expansionEnabled) return;
-
-    // Prefer the FIRST click of the pair when within the dblclick window:
-    // a click-outside collapse triggered by the first click shifts items
-    // below the previously-expanded one, so the browser's dblclick target
-    // (often a common ancestor, or the second-clicked sibling) is wrong.
-    let key: Key | null = null;
-    if (
-      this.prevClickKey !== null &&
-      this.lastClickTime - this.prevClickTime < 500
-    ) {
-      key = this.prevClickKey;
-    }
-    if (key === null) key = this.getKeyFromEvent(e);
-    if (key === null) return;
-
-    // Dblclick on the already-expanded item is a no-op; collapse paths are
-    // Escape, click-outside, and drag start.
-    if (key === this.expandedKey) return;
-
-    this.applyExpanded(key);
-  };
-
-  private onDocumentClick = (e: MouseEvent): void => {
-    // Hit-test by coordinates, not DOM containment. A dismissable layer
-    // (e.g. a portaled context menu) commonly sets `pointer-events:none`
-    // on <body> while open, which routes the click to <html> — DOM
-    // containment then reports the click as outside even when the cursor
-    // was on top of us, spuriously firing clear-on-click-outside.
-    const insideHost = this.isPointInside(this, e.clientX, e.clientY);
-    if (
-      this.clearOnClickOutside &&
-      this.selection.hasSelection() &&
-      !insideHost
-    ) {
-      this.selection.clear();
-    }
-    if (this.expandedKey === null) return;
-    const expanded = this.renderedItems.get(this.expandedKey);
-    if (!expanded) return;
-    if (!this.isPointInside(expanded.element, e.clientX, e.clientY)) {
-      this.applyExpanded(null);
-    }
-  };
-
-  private isPointInside(el: Element, x: number, y: number): boolean {
-    const r = el.getBoundingClientRect();
-    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-  }
-
-  private applyExpanded(next: Key | null): void {
-    if (next === this.expandedKey) return;
-
-    this.tearDownExpansion();
-
-    this.expandedKey = next;
-    this.renderer?.setExpanded?.(next);
-
-    if (next !== null) {
-      // Selection collapses to just the expanded item; chrome is suppressed
-      // in updateItemSelection while expandedKey is set, then reappears on
-      // collapse with the expanded item as the sole selected entry.
-      this.selection.selectOnly(next);
-      const item = this.renderedItems.get(next);
-      if (item) {
-        const inner = item.element.firstElementChild as HTMLElement | null;
-        if (inner) inner.dataset.expanded = "";
-        this.attachExpandedObserver(item.element);
-      }
-    }
-
-    this.renderList();
-  }
-
-  /** Detach observer, restore collapsed height on the previously expanded element. */
-  private tearDownExpansion(): void {
-    if (this.expandedObserver) {
-      this.expandedObserver.disconnect();
-      this.expandedObserver = null;
-    }
-    if (this.expandedKey !== null) {
-      const old = this.renderedItems.get(this.expandedKey);
-      if (old) {
-        old.element.style.height = `${this.itemHeight}px`;
-        const inner = old.element.firstElementChild as HTMLElement | null;
-        if (inner) delete inner.dataset.expanded;
-      }
-    }
-    this.expandedKey = null;
-    this.measuredExpandedHeight = 0;
-  }
-
-  /**
-   * Observe the inner content's natural height and drive the outer
-   * container's numeric height from it. The first fire seeds
-   * measuredExpandedHeight; subsequent fires keep layout in sync as content
-   * reflows. Driving outer numerically (rather than `height:auto`) lets the
-   * CSS height transition fire on expand/collapse.
-   */
-  private attachExpandedObserver(el: HTMLElement): void {
-    const inner = el.firstElementChild as HTMLElement | null;
-    if (!inner) return;
-    this.expandedObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const box = entry.borderBoxSize?.[0];
-      const h = box ? box.blockSize : entry.contentRect.height;
-      if (Math.abs(h - this.measuredExpandedHeight) > 0.5) {
-        this.measuredExpandedHeight = h;
-        el.style.height = `${h}px`;
-        this.renderList();
-      }
-    });
-    this.expandedObserver.observe(inner);
-  }
-
-  /**
-   * Clear expansion synchronously before a drag starts. We suppress the
-   * height transition and force a reflow so getBoundingClientRect() in the
-   * overlay setup sees the collapsed layout immediately — without this the
-   * 0.15s height transition would leave items visibly tall during drag.
-   */
-  private collapseForDrag(): void {
-    if (this.expandedKey === null) return;
-    if (this.expandedObserver) {
-      this.expandedObserver.disconnect();
-      this.expandedObserver = null;
-    }
-    const old = this.renderedItems.get(this.expandedKey);
-    if (old) {
-      const inner = old.element.firstElementChild as HTMLElement | null;
-      if (inner) delete inner.dataset.expanded;
-    }
-    this.expandedKey = null;
-    this.measuredExpandedHeight = 0;
-    this.renderer?.setExpanded?.(null);
-    for (const [, item] of this.renderedItems) {
-      const el = item.element;
-      const prev = el.style.transition;
-      el.style.transition = "none";
-      el.style.height = `${this.itemHeight}px`;
-      void el.offsetHeight;
-      el.style.transition = prev;
-    }
-    this.virtualization.setExpanded(null, this.itemHeight);
-  }
-
-  private onMouseDown = (e: MouseEvent): void => {
-    if (!this.source || e.button !== 0) return;
-    if (this.dragType === "native") return; // native drag handles itself
-
-    // Shift/cmd clicks are handled entirely by onClick
-    const isMac =
-      typeof navigator !== "undefined" &&
-      /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
-    const modKey = isMac ? e.metaKey : e.ctrlKey;
-    if (e.shiftKey || modKey) return;
-
-    const key = this.getKeyFromEvent(e);
-    if (key === null) return;
-
-    // If unselected, select it first
-    if (!this.selection.isSelected(key)) {
-      this.selection.selectOnly(key);
-    }
-
-    this.mouseDownPos = { x: e.clientX, y: e.clientY };
-    this.mouseDownKey = key;
-
-    document.addEventListener("mousemove", this.onDocMouseMove);
-    document.addEventListener("mouseup", this.onDocMouseUp);
-  };
-
-  private onDocMouseMove = (e: MouseEvent): void => {
-    if (!this.mouseDownPos || !this.source) return;
-
-    if (!this.isDragging) {
-      const dx = e.clientX - this.mouseDownPos.x;
-      const dy = e.clientY - this.mouseDownPos.y;
-      if (Math.sqrt(dx * dx + dy * dy) < DRAG_BUFFER_PX) return;
-
-      // Start drag
-      this.startOverlayDrag(e.clientX, e.clientY);
-    }
-
-    // Update drag
-    this.lastPointerPos = { x: e.clientX, y: e.clientY };
-    this.dragOverlay.updatePosition(e.clientX, e.clientY);
-    this.autoscroll.confine = this.confineAutoscroll;
-    this.autoscroll.update(e.clientX, e.clientY);
-
-    this.updateHoverIndex();
-    this.updatePlaceholder();
-    if (this.nudge) this.applyNudge();
-
-    this.dispatchDrag("move", e.clientX, e.clientY);
-  };
-
-  private onDocMouseUp = (e: MouseEvent): void => {
-    document.removeEventListener("mousemove", this.onDocMouseMove);
-    document.removeEventListener("mouseup", this.onDocMouseUp);
-
-    if (this.isDragging) {
-      this.endDrag();
-    }
-
-    this.mouseDownPos = null;
-    this.mouseDownKey = null;
-  };
-
-  private startOverlayDrag(x: number, y: number): void {
-    // Drag always operates on uniform-height layout — collapse first so
-    // grab-offset and overlay sizing math stay correct.
-    this.collapseForDrag();
-
-    this.isDragging = true;
-    this.listbox.style.overflow = "hidden";
-    this.draggedKeys = this.selection.getSelectedKeys();
-    this.dragSet = new Set(this.draggedKeys);
-    this.rebuildCollapsedOrder();
-
-    // Collect rendered elements for the stack
-    const elements: HTMLElement[] = [];
-    let grabElement: HTMLElement | null = null;
-    for (const key of this.draggedKeys) {
-      const item = this.renderedItems.get(key);
-      if (item) {
-        elements.push(item.element);
-        if (key === this.mouseDownKey) grabElement = item.element;
-      }
-    }
-
-    this.dragOverlay.start(
-      elements,
-      this.draggedKeys.length,
-      x,
-      y,
-      this.itemHeight,
-      this.listbox.clientWidth,
-      grabElement ?? elements[0],
-    );
-    // Remove dragged items from DOM — the overlay holds clones, so the
-    // originals are now orphans. cleanup() tears down their per-item
-    // framework root; without it, those roots stay subscribed to outer
-    // signals and fire alongside the freshly-mounted post-drop roots,
-    // corrupting focus/selection and racing the save path on collapse.
-    for (const key of this.draggedKeys) {
-      const item = this.renderedItems.get(key);
-      if (item) {
-        item.cleanup();
-        item.element.remove();
-        this.renderedItems.delete(key);
-      }
-    }
-    this.renderList();
-
-    // Clamp scroll position once to fit collapsed layout
-    const visualCount = this.collapsedOrder.length;
-    const listHeight = Math.max(
-      this.virtualization.getTotalHeight(visualCount),
-      this.parent.clientHeight,
-    );
-    const maxScroll = listHeight - this.parent.clientHeight;
-    if (this.parent.scrollTop > maxScroll) {
-      this.parent.scrollTop = Math.max(0, maxScroll);
-    }
-
-    this.dispatchDrag("start", x, y);
-  }
-
-  /**
-   * Overlay-mode drag lifecycle event. Foreign drop zones listen for these
-   * to highlight on hover and consume on release. `dragend` is cancelable —
-   * a consuming zone calls `preventDefault()` to skip the internal reorder.
-   * Native mode users rely on the platform's HTML5 drag events instead.
-   */
-  private dispatchDrag(
-    type: "start" | "move" | "end",
-    x: number,
-    y: number,
-  ): boolean {
-    if (this.dragType !== "overlay") return false;
-    if (this.draggedKeys.length === 0) return false;
-    const items = this.source
-      ? this.draggedKeys
-          .map((k) => this.source!.getItem(k))
-          .filter((i): i is unknown => i !== undefined)
-      : [];
-    const event = new CustomEvent(`primavera-dnd-drag${type}`, {
-      bubbles: true,
-      composed: true,
-      cancelable: type === "end",
-      detail: { keys: [...this.draggedKeys], items, x, y },
-    });
-    this.dispatchEvent(event);
-    return event.defaultPrevented;
-  }
-
-  private endDrag(): void {
-    const pos = this.lastPointerPos ?? { x: 0, y: 0 };
-    const consumed = this.dispatchDrag("end", pos.x, pos.y);
-
-    this.dragOverlay.stop();
-    this.autoscroll.stop();
-    this.placeholder.clear();
-
-    if (!consumed && this.reorder && this.hoverIndex !== null && this.source) {
-      // Compute the beforeKey from hoverIndex
-      const beforeKey =
-        this.hoverIndex < this.collapsedOrder.length
-          ? this.collapsedOrder[this.hoverIndex]
-          : null;
-
-      const txnId = this.source.apply([
-        { type: "move", keys: this.draggedKeys, beforeKey },
-      ]);
-      this.source._commitUI(txnId);
-      this.source._commitState(txnId);
-    }
-
-    // Remove dragged items from DOM so renderList() re-mounts them
-    // at their new position — no stale top value to transition from.
-    for (const key of this.draggedKeys) {
-      const item = this.renderedItems.get(key);
-      if (item) {
-        item.cleanup();
-        item.element.remove();
-        this.renderedItems.delete(key);
-      }
-    }
-
-    this.isDragging = false;
-    this.hoverIndex = null;
-    this.lastPointerPos = null;
-    this.draggedKeys = [];
-    this.dragSet.clear();
-    this.collapsedOrder = [];
-    this.visualIndexMap.clear();
-    this.listbox.style.overflow = "";
-    this.renderList();
-  }
-
-  // ── Native drag ─────────────────────────────────────────────────
-
-  private onNativeDragStart = (e: DragEvent, key: Key): void => {
-    if (!this.source || !this.renderer) return;
-
-    // Ensure item is selected
-    if (!this.selection.isSelected(key)) {
-      this.selection.selectOnly(key);
-    }
-
-    this.collapseForDrag();
-    this.isDragging = true;
-    this.draggedKeys = this.selection.getSelectedKeys();
-    this.dragSet = new Set(this.draggedKeys);
-    this.rebuildCollapsedOrder();
-
-    if (!this.dragNative) {
-      this.dragNative = new DndDragNative(this.renderer);
-    }
-
-    const items = this.draggedKeys
-      .map((k) => this.source!.getItem(k))
-      .filter((i) => i !== undefined);
-    this.dragNative.onDragStart(e, this.draggedKeys, items);
-
-    // Listen for dragover/drop on listbox
-    this.listbox.addEventListener("dragover", this.onNativeDragOver);
-    this.listbox.addEventListener("drop", this.onNativeDrop);
-    this.listbox.addEventListener("dragleave", this.onNativeDragLeave);
-
-    this.renderList();
-  };
-
-  private onNativeDragOver = (e: DragEvent): void => {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-
-    const rect = this.parent.getBoundingClientRect();
-    const y = e.clientY - rect.top + this.parent.scrollTop;
-    const order = this.source!.getOrder();
-    this.hoverIndex = this.virtualization.getIndexAtY(y, order.length + 1);
-
-    this.autoscroll.update(e.clientX, e.clientY);
-    this.updatePlaceholder();
-    if (this.nudge) this.applyNudge();
-  };
-
-  private onNativeDragLeave = (): void => {
-    this.hoverIndex = null;
-    this.placeholder.clear();
-  };
-
-  private onNativeDrop = (e: DragEvent): void => {
-    e.preventDefault();
-    this.endDrag();
-  };
-
-  private onNativeDragEnd = (): void => {
-    this.listbox.removeEventListener("dragover", this.onNativeDragOver);
-    this.listbox.removeEventListener("drop", this.onNativeDrop);
-    this.listbox.removeEventListener("dragleave", this.onNativeDragLeave);
-
-    if (this.dragNative) this.dragNative.onDragEnd();
-    this.autoscroll.stop();
-
-    if (this.isDragging) {
-      // Drag cancelled (e.g. escape or dropped outside)
-      this.isDragging = false;
-      this.hoverIndex = null;
-      this.draggedKeys = [];
-      this.dragSet.clear();
-      this.collapsedOrder = [];
-      this.visualIndexMap.clear();
-      this.listbox.style.overflow = "";
-      this.placeholder.clear();
-      this.renderList();
-    }
-  };
-
-  // ── Touch ───────────────────────────────────────────────────────
-
-  private onTouchStart = (e: TouchEvent): void => {
-    if (!this.source) return;
-    const key = this.getKeyFromTouchEvent(e);
-    if (key === null) return;
-
-    const t = e.touches[0];
-    this.touch.onTouchStart(key, t.clientX, t.clientY);
-  };
-
-  private onTouchMove = (e: TouchEvent): void => {
-    const t = e.touches[0];
-    const result = this.touch.onTouchMove(t.clientX, t.clientY);
-
-    switch (result.type) {
-      case "drag-start":
-        e.preventDefault();
-        if (!this.selection.isSelected(result.key)) {
-          this.selection.selectOnly(result.key);
-        }
-        this.startOverlayDrag(result.x, result.y);
-        break;
-
-      case "dragging":
-        e.preventDefault();
-        this.dragOverlay.updatePosition(result.x, result.y);
-        this.autoscroll.update(result.x, result.y);
-
-        // Update hover index
-        if (this.source) {
-          const rect = this.parent.getBoundingClientRect();
-          if (
-            result.x >= rect.left &&
-            result.x <= rect.right &&
-            result.y >= rect.top &&
-            result.y <= rect.bottom
-          ) {
-            const y = result.y - rect.top + this.parent.scrollTop;
-            this.hoverIndex = this.virtualization.getIndexAtY(
-              y,
-              this.source.getOrder().length,
-            );
-          } else {
-            this.hoverIndex = null;
-          }
-          this.updatePlaceholder();
-          if (this.nudge) this.applyNudge();
-        }
-        this.dispatchDrag("move", result.x, result.y);
-        break;
-
-      case "scroll":
-        // Let default scroll happen
-        break;
-    }
-  };
-
-  private onTouchEnd = (e: TouchEvent): void => {
-    const t = e.changedTouches[0];
-    const result = this.touch.onTouchEnd(t.clientX, t.clientY);
-
-    switch (result.type) {
-      case "select":
-        this.selection.selectOnly(result.key);
-        break;
-
-      case "drag-end":
-        this.endDrag();
-        break;
-    }
-  };
-
-  // ── Placeholder ─────────────────────────────────────────────────
-
-  private updateHoverIndex(): void {
-    if (!this.source || !this.lastPointerPos) return;
-    const rect = this.parent.getBoundingClientRect();
-    const { x, y } = this.lastPointerPos;
-    if (
-      x >= rect.left &&
-      x <= rect.right &&
-      y >= rect.top &&
-      y <= rect.bottom
-    ) {
-      const scrollY = y - rect.top + this.parent.scrollTop;
-      const nonDragCount = this.collapsedOrder.length;
-      this.hoverIndex = Math.max(
-        0,
-        Math.min(
-          Math.floor(scrollY / this.itemHeight),
-          nonDragCount,
-        ),
-      );
-    } else {
-      this.hoverIndex = null;
-    }
-  }
-
-  private updatePlaceholder(): void {
-    if (!this.reorder || this.hoverIndex === null) {
-      this.placeholder.clear();
-      return;
-    }
-
-    const y = this.hoverIndex * this.itemHeight - this.parent.scrollTop;
-    this.placeholder.renderPlaceholder(y);
-  }
-
-  // ── Helpers ─────────────────────────────────────────────────────
-
-  private getKeyFromEvent(e: MouseEvent): Key | null {
-    const target = e.target as HTMLElement;
-    const option = target.closest<HTMLElement>("[role=option]");
-    if (!option || option.dataset.key === undefined) return null;
-    return option.dataset.key;
-  }
-
-  private getKeyFromTouchEvent(e: TouchEvent): Key | null {
-    const target = e.target as HTMLElement;
-    const option = target.closest<HTMLElement>("[role=option]");
-    if (!option || option.dataset.key === undefined) return null;
-    return option.dataset.key;
-  }
+  // ── Cleanup ─────────────────────────────────────────────────────
 
   private cleanup(): void {
-    this.parent?.removeEventListener("scroll", this.onScroll);
-    this.listbox?.removeEventListener("keydown", this.onKeyDown);
-    this.listbox?.removeEventListener("mousedown", this.onMouseDown);
-    this.listbox?.removeEventListener("click", this.onClick);
-    this.listbox?.removeEventListener("dblclick", this.onDblClick);
-    this.listbox?.removeEventListener("touchstart", this.onTouchStart);
-    this.listbox?.removeEventListener("touchmove", this.onTouchMove);
-    this.listbox?.removeEventListener("touchend", this.onTouchEnd);
-    document.removeEventListener("click", this.onDocumentClick);
-    document.removeEventListener("mousemove", this.onDocMouseMove);
-    document.removeEventListener("mouseup", this.onDocMouseUp);
-    this.autoscroll?.stop();
-    if (this.scrollRaf !== null) cancelAnimationFrame(this.scrollRaf);
-    this.dragOverlay?.stop();
-    this.touch?.cancel();
-    if (this.sourceUnsub) this.sourceUnsub();
-    if (this.sourceSyncUnsub) this.sourceSyncUnsub();
-    if (this.selectionUnsub) this.selectionUnsub();
-    if (this.expandedObserver) {
-      this.expandedObserver.disconnect();
-      this.expandedObserver = null;
-    }
-    if (this.parentResizeObserver) {
-      this.parentResizeObserver.disconnect();
-      this.parentResizeObserver = null;
+    if (this.controller) {
+      this.parentEl.removeEventListener("scroll", this.controller.onScroll);
+      this.listbox.removeEventListener("keydown", this.controller.onKeyDown);
+      this.listbox.removeEventListener("mousedown", this.controller.onMouseDown);
+      this.listbox.removeEventListener("click", this.controller.onClick);
+      this.listbox.removeEventListener("dblclick", this.controller.onDblClick);
+      this.listbox.removeEventListener("touchstart", this.controller.onTouchStart);
+      this.listbox.removeEventListener("touchmove", this.controller.onTouchMove);
+      this.listbox.removeEventListener("touchend", this.controller.onTouchEnd);
+      this.controller.destroy();
+      this.controller = null;
     }
     this.clearAllItems();
   }

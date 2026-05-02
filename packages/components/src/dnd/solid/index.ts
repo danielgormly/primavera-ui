@@ -1,5 +1,5 @@
 export { Dnd } from "./Dnd";
-export type { DndProps } from "./Dnd";
+export type { DndProps, DndImperative } from "./Dnd";
 export { DndSelection } from "../core/selection";
-export type { Key, DndOp } from "../core/types";
-export type { PrimaveraDnd } from "../vanilla/container";
+export { DndSource } from "../core/source";
+export type { Key, DndOp, Block, Selection } from "../core/types";

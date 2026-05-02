@@ -4,56 +4,36 @@ import {
   onMount,
   onCleanup,
   createEffect,
-  createRoot,
-  getOwner,
   on,
+  For,
+  Show,
   type JSX,
 } from "solid-js";
-import { insert } from "solid-js/web";
 import { DndSource } from "../core/source";
 import { DndSelection } from "../core/selection";
-import { register } from "../index";
-import { PrimaveraDnd } from "../vanilla/container";
-import type { Key, DndOp, DndRenderer } from "../core/types";
+import {
+  DndController,
+  type DndControllerConfig,
+  type DndRenderItem,
+} from "../core/dnd-controller";
+import type { Key, DndOp } from "../core/types";
 
-declare module "solid-js" {
-  namespace JSX {
-    interface IntrinsicElements {
-      "primavera-dnd": JSX.HTMLAttributes<HTMLElement>;
-    }
-    interface ExplicitAttributes {
-      "item-height": string;
-      expandable: string;
-      "drag-type": "native" | "overlay";
-      overscan: string;
-      "confine-autoscroll": string;
-      "autoscroll-buffer": string;
-      "drag-stack-count": string;
-      nudge: string;
-      "rounded-select": string;
-      autofocus: string;
-      multi: string;
-      "clear-on-click-outside": string;
-      "fill-height": string;
-      reorder: string;
-    }
-  }
+const BORDER_RADIUS_PX = 4;
+
+export interface DndImperative {
+  setExpanded(key: Key | null): void;
+  getExpanded(): Key | null;
+  getSelection(): { blocks: any[]; active: any | null };
 }
 
 export interface DndProps<T> {
   items: T[];
   setItems?: (next: T[]) => void;
   onReorder?: (op: DndOp<T>) => void;
-  /** Receives the underlying `<primavera-dnd>` element for imperative calls
-   *  like `setExpanded(key)` / `getExpanded()` / `getSelection()`. */
-  ref?: (el: PrimaveraDnd) => void;
+  /** Receives an imperative handle for setExpanded / getExpanded / getSelection. */
+  ref?: (handle: DndImperative) => void;
   getKey: (item: T) => Key;
-  /**
-   * Optional consumer-owned selection model. When provided, the consumer
-   * can mutate / observe selection from outside. Treated as a single-shot
-   * injection — swapping the prop after mount is not supported (same shape
-   * as `items`/source: re-mount the Dnd to swap).
-   */
+  /** Optional consumer-owned selection model. */
   selection?: DndSelection;
   itemHeight?: number;
   expandable?: boolean;
@@ -62,40 +42,40 @@ export interface DndProps<T> {
   autoscrollBuffer?: number;
   dragStackCount?: number;
   nudge?: boolean;
-  /** When false, this list refuses to reorder itself. Drag still picks up
-   *  items and fires `primavera-dnd-drag*` events (so foreign drop zones
-   *  still work), but nudge, placeholder, same-list drop, and ⌘/ctrl+↑/↓
-   *  are suppressed. Default true. */
+  /** When false, this list refuses to reorder itself. */
   reorder?: boolean;
   roundedSelect?: boolean;
   autofocus?: boolean;
-  /** When false, shift/cmd-click and shift+arrow keys collapse to
-   *  single-select. Default true. */
+  /** When false, shift/cmd-click and shift+arrow keys collapse to single-select. */
   multi?: boolean;
-  /** When true, a click anywhere outside the Dnd element clears
-   *  selection. Default false. */
+  /** When true, a click anywhere outside the Dnd element clears selection. */
   clearOnClickOutside?: boolean;
-  /** When true, the host fills its parent's height (the original behaviour:
-   *  host + scroll viewport are `height: 100%`, listbox `min-height: 100%`).
-   *  When false (default), the host collapses to content height — use this
-   *  inside auto-height parents so siblings stack cleanly underneath. */
+  /** When true, host fills its parent's height. */
   fillHeight?: boolean;
   dragType?: "native" | "overlay";
+  /** Optional native-drop-data hook (drag-type="native" only). */
+  getNativeDropData?: (
+    keys: Key[],
+    items: T[],
+  ) => Array<{ type: string; data: string }>;
   class?: string;
   style?: JSX.CSSProperties | string;
   children: (item: () => T, expanded: () => boolean) => JSX.Element;
 }
 
 export function Dnd<T>(props: DndProps<T>): JSX.Element {
-  register();
+  let hostEl!: HTMLDivElement;
+  let parentEl!: HTMLDivElement;
+  let listboxEl!: HTMLDivElement;
 
-  let el!: PrimaveraDnd;
-  let source: DndSource<T> | null = null;
+  // Per-key DOM refs used by the controller for overlay clones, expansion
+  // observer, hit-testing, and so on.
+  const itemEls = new Map<Key, HTMLDivElement>();
+  const innerEls = new Map<Key, HTMLDivElement>();
 
-  // Captured at component setup so per-item roots can chain to the host's
-  // owner — keeps `useContext`, error boundaries, and cleanup propagation
-  // working across the custom-element boundary.
-  const owner = getOwner();
+  // version() bumps on every controller onChange; reactive getters depend
+  // on it so render state stays consistent without per-property signals.
+  const [version, setVersion] = createSignal(0);
 
   const keyIndex = createMemo(() => {
     const m = new Map<Key, T>();
@@ -103,25 +83,34 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     return m;
   });
 
-  const [expandedKey, setExpandedKey] = createSignal<Key | null>(null);
+  let controller: DndController | null = null;
+  let source: DndSource<T> | null = null;
 
-  const renderer: DndRenderer<T> = {
-    mount(key, initialItem, container) {
-      return createRoot((dispose) => {
-        insert(container, () => {
-          const item = createMemo(() => keyIndex().get(key) ?? initialItem);
-          const expanded = createMemo(() => expandedKey() === key);
-          return props.children(item, expanded);
-        });
-        return dispose;
-      }, owner ?? undefined);
-    },
-    setExpanded(key) {
-      setExpandedKey(() => key);
-    },
-  };
+  const cfg = (): DndControllerConfig => ({
+    itemHeight: props.itemHeight ?? 32,
+    overscan: props.overscan ?? 2,
+    dragType: props.dragType ?? "overlay",
+    roundedSelect: props.roundedSelect ?? true,
+    expansionEnabled: props.expandable ?? false,
+    confineAutoscroll: props.confineAutoscroll ?? true,
+    autoscrollBuffer: props.autoscrollBuffer ?? 32,
+    dragStackCount: props.dragStackCount ?? 3,
+    nudge: props.nudge ?? true,
+    reorder: props.reorder !== false,
+    multi: props.multi !== false,
+    clearOnClickOutside: props.clearOnClickOutside ?? false,
+    fillHeight: props.fillHeight ?? false,
+  });
 
   onMount(() => {
+    controller = new DndController({
+      config: cfg(),
+      host: { host: hostEl, parent: parentEl, listbox: listboxEl },
+      onChange: () => setVersion((v) => v + 1),
+      getItemElement: (key) => itemEls.get(key) ?? null,
+      getItemInnerElement: (key) => innerEls.get(key) ?? null,
+    });
+
     source = new DndSource<T>({
       getKey: props.getKey,
       getOrder: () => props.items.map(props.getKey),
@@ -155,10 +144,47 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       props.onReorder?.(op);
     });
 
-    el.setSource(source);
-    if (props.selection) el.setSelection(props.selection);
-    el.setRenderer(renderer);
-    props.ref?.(el);
+    controller.setSource(source);
+    if (props.selection) controller.setSelection(props.selection);
+    controller.setRenderer({
+      // Solid owns per-item rendering through JSX/<For>; the renderer's mount
+      // is intentionally a no-op so no per-item Solid roots are created — the
+      // whole point of this architecture.
+      mount: () => () => {},
+      // Bridges the controller's expanded-key bookkeeping back into Solid
+      // signals via setVersion → reactive bindings update.
+      setExpanded: () => {
+        // No-op: the controller already calls opts.onChange() after applyExpanded,
+        // which bumps version() and re-evaluates expanded() per item.
+      },
+      getNativeDropData: props.getNativeDropData,
+    });
+
+    // Wire DOM events
+    parentEl.addEventListener("scroll", controller.onScroll, { passive: true });
+    listboxEl.addEventListener("keydown", controller.onKeyDown);
+    listboxEl.addEventListener("mousedown", controller.onMouseDown);
+    listboxEl.addEventListener("click", controller.onClick);
+    listboxEl.addEventListener("dblclick", controller.onDblClick);
+    listboxEl.addEventListener("touchstart", controller.onTouchStart, {
+      passive: false,
+    });
+    listboxEl.addEventListener("touchmove", controller.onTouchMove, {
+      passive: false,
+    });
+    listboxEl.addEventListener("touchend", controller.onTouchEnd);
+
+    if (props.autofocus) {
+      queueMicrotask(() => listboxEl.focus());
+    }
+
+    props.ref?.({
+      setExpanded: (k) => controller!.setExpanded(k),
+      getExpanded: () => controller!.getExpanded(),
+      getSelection: () => controller!.getSelection(),
+    });
+
+    setVersion((v) => v + 1);
   });
 
   // External item changes — re-sync source order
@@ -172,33 +198,266 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     ),
   );
 
+  // Live-track config changes (excluding ones that need re-init like dragType)
+  createEffect(() => {
+    if (!controller) return;
+    controller.setConfig(cfg());
+  });
+
   onCleanup(() => {
-    // PrimaveraDnd.disconnectedCallback handles its own teardown
+    if (controller) {
+      parentEl.removeEventListener("scroll", controller.onScroll);
+      listboxEl.removeEventListener("keydown", controller.onKeyDown);
+      listboxEl.removeEventListener("mousedown", controller.onMouseDown);
+      listboxEl.removeEventListener("click", controller.onClick);
+      listboxEl.removeEventListener("dblclick", controller.onDblClick);
+      listboxEl.removeEventListener("touchstart", controller.onTouchStart);
+      listboxEl.removeEventListener("touchmove", controller.onTouchMove);
+      listboxEl.removeEventListener("touchend", controller.onTouchEnd);
+      controller.destroy();
+      controller = null;
+    }
+  });
+
+  // Reactive render state.
+  const renderState = createMemo(() => {
+    version();
+    return (
+      controller?.getRenderState() ?? {
+        isDragging: false,
+        listboxHeight: 0,
+        items: [] as DndRenderItem[],
+        keepAlive: [] as DndRenderItem[],
+      }
+    );
+  });
+
+  // <For> over the union of visible + dragged keys. Using a single keyed list
+  // means dragged items are kept mounted (not unmounted-then-remounted) across
+  // drag start/end, so consumer per-item state — input edits, hover, focus —
+  // survives the drag. This is the architectural advantage over the old
+  // per-item-Solid-root design.
+  //
+  // We pass an array of KEYS (primitives) — not item-state objects — because
+  // Solid's <For> keys rows by reference (===). With primitives, "5" === "5"
+  // matches across renders so rows are reused; with fresh objects, every
+  // render fully unmounts and remounts every row, losing state.
+  //
+  // Critically, the order returned here must stay STABLE across reorders.
+  // Solid's <For> reorders DOM via insertBefore when the key array order
+  // changes — and moving a DOM node within its parent resets running CSS
+  // transitions (Chrome/Safari). Keeping DOM order at insertion-order
+  // means top/height transitions on `.dnd-item` actually fire when items
+  // logically reorder; visual order is driven entirely by absolute `top`.
+  const stableKeyOrder: Key[] = [];
+  const renderKeys = createMemo<Key[]>(() => {
+    const s = renderState();
+    const wanted = new Set<Key>();
+    for (const it of s.items) wanted.add(it.key);
+    for (const it of s.keepAlive) wanted.add(it.key);
+
+    // Drop keys that left the visible/keep-alive set; keep insertion order
+    // for everyone else (no DOM reorder → transitions survive).
+    for (let i = stableKeyOrder.length - 1; i >= 0; i--) {
+      if (!wanted.has(stableKeyOrder[i])) stableKeyOrder.splice(i, 1);
+    }
+    const have = new Set(stableKeyOrder);
+    for (const it of s.items) {
+      if (!have.has(it.key)) {
+        stableKeyOrder.push(it.key);
+        have.add(it.key);
+      }
+    }
+    for (const it of s.keepAlive) {
+      if (!have.has(it.key)) {
+        stableKeyOrder.push(it.key);
+        have.add(it.key);
+      }
+    }
+    // Return a fresh array so the memo dependents recompute on adds/removes
+    // — but the contained primitives match by `===` so <For> reuses rows.
+    return stableKeyOrder.slice();
+  });
+
+  // Look up the per-item state by key so <For> rows derive their props
+  // reactively without re-creating row JSX on every state change.
+  const stateByKey = createMemo(() => {
+    const s = renderState();
+    const map = new Map<Key, DndRenderItem>();
+    for (const it of s.items) map.set(it.key, it);
+    for (const it of s.keepAlive) map.set(it.key, it);
+    return map;
+  });
+
+  const ariaMulti = createMemo<"true" | "false">(() =>
+    props.multi !== false ? "true" : "false",
+  );
+
+  const hostStyle = createMemo<JSX.CSSProperties>(() => {
+    const fill = props.fillHeight ?? false;
+    return {
+      position: "relative",
+      display: "block",
+      ...(fill ? { height: "100%" } : {}),
+    };
+  });
+
+  const parentStyle = createMemo<JSX.CSSProperties>(() => {
+    const fill = props.fillHeight ?? false;
+    return {
+      position: "relative",
+      "overflow-y": "auto",
+      "z-index": 2,
+      ...(fill ? { height: "100%" } : {}),
+    };
+  });
+
+  const listboxStyle = createMemo<JSX.CSSProperties>(() => {
+    const fill = props.fillHeight ?? false;
+    return {
+      position: "relative",
+      outline: "none",
+      height: `${renderState().listboxHeight}px`,
+      ...(fill ? { "min-height": "100%" } : {}),
+      ...(renderState().isDragging ? { overflow: "hidden" } : {}),
+    };
+  });
+
+  const styleSheet = createMemo(() => {
+    const base = `
+      .dnd-item {
+        position: absolute;
+        left: 0;
+        right: 0;
+        overflow: hidden;
+        transition: top 0.15s ease, height 0.15s ease;
+      }
+      .dnd-item-inner {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+      }
+      .dnd-item-inner[data-expanded] {
+        bottom: auto;
+      }
+      [data-selected] { background: var(--dnd-select-bg, transparent); z-index: 1; }
+    `;
+    if (!(props.roundedSelect ?? true)) return base;
+    return `
+      ${base}
+      [data-sel-first] { border-top-left-radius: ${BORDER_RADIUS_PX}px; border-top-right-radius: ${BORDER_RADIUS_PX}px; }
+      [data-sel-last] { border-bottom-left-radius: ${BORDER_RADIUS_PX}px; border-bottom-right-radius: ${BORDER_RADIUS_PX}px; }
+    `;
+  });
+
+  // After the host renders item DOM, give the controller a chance to
+  // (re)attach the expansion observer to the inner element.
+  createEffect(() => {
+    renderKeys();
+    stateByKey();
+    queueMicrotask(() => controller?.syncExpansionObserver());
+  });
+
+  // Imperative <style> element — emitting via JSX `<style>{expr}</style>` is
+  // brittle (Solid's reactive child wrapper inserts marker comments into the
+  // <style>'s textContent, which the browser parses as invalid CSS and
+  // discards the whole sheet). Without the CSS, `.dnd-item` loses its
+  // top/height transitions and `.dnd-item-inner[data-expanded]` never flips
+  // to `bottom:auto`, so the ResizeObserver only sees the outer's collapsed
+  // height and the expanded item never grows.
+  let styleEl!: HTMLStyleElement;
+  createEffect(() => {
+    if (styleEl) styleEl.textContent = styleSheet();
   });
 
   return (
-    <primavera-dnd
-      ref={el}
+    <div
+      ref={hostEl}
       class={props.class}
-      style={props.style as any}
-      attr:item-height={String(props.itemHeight ?? 40)}
-      attr:expandable={props.expandable ? "" : undefined}
-      attr:drag-type={props.dragType ?? "overlay"}
-      attr:overscan={props.overscan != null ? String(props.overscan) : undefined}
-      attr:confine-autoscroll={String(props.confineAutoscroll ?? true)}
-      attr:autoscroll-buffer={
-        props.autoscrollBuffer != null ? String(props.autoscrollBuffer) : undefined
+      style={
+        typeof props.style === "string"
+          ? props.style
+          : { ...hostStyle(), ...((props.style as JSX.CSSProperties) ?? {}) }
       }
-      attr:drag-stack-count={
-        props.dragStackCount != null ? String(props.dragStackCount) : undefined
-      }
-      attr:nudge={String(props.nudge ?? true)}
-      attr:reorder={props.reorder === false ? "false" : undefined}
-      attr:rounded-select={String(props.roundedSelect ?? true)}
-      attr:autofocus={props.autofocus ? "" : undefined}
-      attr:multi={props.multi === false ? "false" : undefined}
-      attr:clear-on-click-outside={props.clearOnClickOutside ? "" : undefined}
-      attr:fill-height={props.fillHeight ? "" : undefined}
-    />
+    >
+      <style ref={styleEl} />
+      <div
+        ref={parentEl}
+        class="dnd-parent"
+        tabindex="-1"
+        style={parentStyle()}
+      >
+        <div
+          ref={listboxEl}
+          role="listbox"
+          aria-multiselectable={ariaMulti()}
+          tabindex="0"
+          style={listboxStyle()}
+        >
+          <For each={renderKeys()}>
+            {(key) => {
+              const state = createMemo(() => stateByKey().get(key));
+              const item = createMemo(() => keyIndex().get(key));
+              const expanded = createMemo(() => state()?.expanded ?? false);
+              const selected = createMemo(() => state()?.selected ?? false);
+              const selFirst = createMemo(() => state()?.selFirst ?? false);
+              const selLast = createMemo(() => state()?.selLast ?? false);
+              const hidden = createMemo(() => state()?.hidden ?? false);
+              const top = createMemo(() => state()?.top ?? 0);
+              const height = createMemo(
+                () => state()?.height ?? props.itemHeight ?? 32,
+              );
+
+              const isNative = createMemo(
+                () => (props.dragType ?? "overlay") === "native",
+              );
+
+              return (
+                <div
+                  ref={(el) => {
+                    itemEls.set(key, el);
+                  }}
+                  class="dnd-item"
+                  role="option"
+                  data-key={String(key)}
+                  data-selected={selected() ? "" : undefined}
+                  data-sel-first={selFirst() ? "" : undefined}
+                  data-sel-last={selLast() ? "" : undefined}
+                  aria-selected={selected() ? "true" : "false"}
+                  draggable={isNative()}
+                  onDragStart={(e) => {
+                    if (isNative()) controller?.onNativeDragStart(e, key);
+                  }}
+                  onDragEnd={() => {
+                    if (isNative()) controller?.onNativeDragEnd();
+                  }}
+                  style={{
+                    top: `${top()}px`,
+                    height: `${height()}px`,
+                    ...(hidden()
+                      ? { display: "none", "pointer-events": "none" }
+                      : {}),
+                  }}
+                >
+                  <div
+                    ref={(el) => {
+                      innerEls.set(key, el);
+                    }}
+                    class="dnd-item-inner"
+                    data-expanded={expanded() ? "" : undefined}
+                  >
+                    <Show when={item() !== undefined}>
+                      {props.children(item as () => T, expanded)}
+                    </Show>
+                  </div>
+                </div>
+              );
+            }}
+          </For>
+        </div>
+      </div>
+    </div>
   );
 }
