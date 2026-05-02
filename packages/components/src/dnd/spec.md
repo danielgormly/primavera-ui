@@ -184,11 +184,13 @@ addBlock(item)
   → merge
 
 extendActive(item)
+  if anchor != to and item is on the opposite side of anchor from to:
+    active.anchor = active.to    // pivot so the block grows rather than flips
   active.to = item
   → merge
-  Note: this can grow or shrink the block depending on direction
-  relative to anchor. If item is between anchor and the current to,
-  the block contracts.
+  Invariant: shift+select outside the current range is always additive —
+  items already in the active block are never dropped. The block contracts
+  only when item is between anchor and the current to (inside the block).
 
 toggleItem(item)
   if item ∈ active:

@@ -115,6 +115,15 @@ export class DndSelection {
       this.selectOnly(item);
       return;
     }
+    const anchorIdx = this.orderIndex.get(this.active.anchor)!;
+    const toIdx = this.orderIndex.get(this.active.to)!;
+    const itemIdx = this.orderIndex.get(item)!;
+    // If the new target is past the anchor (opposite side from current `to`),
+    // pivot the anchor to the current `to` so the block grows rather than
+    // flips — shift+select outside the current range is always additive.
+    if (anchorIdx !== toIdx && Math.sign(itemIdx - anchorIdx) === -Math.sign(toIdx - anchorIdx)) {
+      this.active.anchor = this.active.to;
+    }
     this.active.to = item;
     this.merge();
     this.notify();
