@@ -77,6 +77,11 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
   // on it so render state stays consistent without per-property signals.
   const [version, setVersion] = createSignal(0);
 
+  // Singleton expansion state lifted into Solid so per-row `expanded()` and
+  // host-level `data-expanded` derive directly from a primitive signal —
+  // not from the broad version() bump via per-item render-state lookup.
+  const [expandedKey, setExpandedKey] = createSignal<Key | null>(null);
+
   const keyIndex = createMemo(() => {
     const m = new Map<Key, T>();
     for (const item of props.items) m.set(props.getKey(item), item);
@@ -151,12 +156,10 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       // is intentionally a no-op so no per-item Solid roots are created — the
       // whole point of this architecture.
       mount: () => () => {},
-      // Bridges the controller's expanded-key bookkeeping back into Solid
-      // signals via setVersion → reactive bindings update.
-      setExpanded: () => {
-        // No-op: the controller already calls opts.onChange() after applyExpanded,
-        // which bumps version() and re-evaluates expanded() per item.
-      },
+      // Push singleton expansion state into Solid as a primitive signal so
+      // only the matching row reacts on flip — instead of every row reading
+      // through the per-item state map on every version() bump.
+      setExpanded: (k) => setExpandedKey(k),
       getNativeDropData: props.getNativeDropData,
     });
 
@@ -293,11 +296,6 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     props.multi !== false ? "true" : "false",
   );
 
-  const anyExpanded = createMemo(() => {
-    version();
-    return controller?.getExpanded() != null;
-  });
-
   const hostStyle = createMemo<JSX.CSSProperties>(() => {
     const fill = props.fillHeight ?? false;
     return {
@@ -381,7 +379,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     <div
       ref={hostEl}
       class={props.class}
-      data-expanded={anyExpanded() ? "" : undefined}
+      data-expanded={expandedKey() != null ? "" : undefined}
       style={
         typeof props.style === "string"
           ? props.style
@@ -406,7 +404,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
             {(key) => {
               const state = createMemo(() => stateByKey().get(key));
               const item = createMemo(() => keyIndex().get(key));
-              const expanded = createMemo(() => state()?.expanded ?? false);
+              const expanded = createMemo(() => expandedKey() === key);
               const selected = createMemo(() => state()?.selected ?? false);
               const selFirst = createMemo(() => state()?.selFirst ?? false);
               const selLast = createMemo(() => state()?.selLast ?? false);

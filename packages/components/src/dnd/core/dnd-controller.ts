@@ -744,6 +744,7 @@ export class DndController {
   onMouseDown = (e: MouseEvent): void => {
     if (!this.source || e.button !== 0) return;
     if (this.cfg.dragType === "native") return;
+    if (this.expandedKey !== null) return;
     const modKey = isMac ? e.metaKey : e.ctrlKey;
     if (e.shiftKey || modKey) return;
 
@@ -909,6 +910,10 @@ export class DndController {
   /** Host wires to per-item dragstart event for native drag mode. */
   onNativeDragStart = (e: DragEvent, key: Key): void => {
     if (!this.source || !this.renderer) return;
+    if (this.expandedKey !== null) {
+      e.preventDefault();
+      return;
+    }
     if (!this.selection.isSelected(key)) {
       this.selection.selectOnly(key);
     }
@@ -991,6 +996,7 @@ export class DndController {
 
   onTouchStart = (e: TouchEvent): void => {
     if (!this.source) return;
+    if (this.expandedKey !== null) return;
     const key = this.getKeyFromTouchEvent(e);
     if (key === null) return;
     const t = e.touches[0];
