@@ -33,6 +33,7 @@ declare module "solid-js" {
       multi: string;
       "clear-on-click-outside": string;
       "fill-height": string;
+      reorder: string;
     }
   }
 }
@@ -59,6 +60,11 @@ export interface DndProps<T> {
   autoscrollBuffer?: number;
   dragStackCount?: number;
   nudge?: boolean;
+  /** When false, this list refuses to reorder itself. Drag still picks up
+   *  items and fires `primavera-dnd-drag*` events (so foreign drop zones
+   *  still work), but nudge, placeholder, same-list drop, and ⌘/ctrl+↑/↓
+   *  are suppressed. Default true. */
+  reorder?: boolean;
   roundedSelect?: boolean;
   autofocus?: boolean;
   /** When false, shift/cmd-click and shift+arrow keys collapse to
@@ -178,6 +184,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
         props.dragStackCount != null ? String(props.dragStackCount) : undefined
       }
       attr:nudge={String(props.nudge ?? true)}
+      attr:reorder={props.reorder === false ? "false" : undefined}
       attr:rounded-select={String(props.roundedSelect ?? true)}
       attr:autofocus={props.autofocus ? "" : undefined}
       attr:multi={props.multi === false ? "false" : undefined}

@@ -18,6 +18,7 @@ Name | Type | Default
 | expandable | boolean | false
 | multi | boolean | true
 | clear-on-click-outside | boolean | false
+| reorder | boolean | true
 
 ## Web Component
 ```
@@ -290,6 +291,10 @@ When `drag-type='overlay'`, a full-page overlay captures pointer events and disp
 ### Foreign drop zones (overlay mode)
 
 Bubbling `CustomEvent`s `primavera-dnd-dragstart` / `-dragmove` / `-dragend` fire on `<primavera-dnd>` with `detail: { keys, items, x, y }`; foreign drop zones hit-test their own bounds and call `preventDefault()` on `dragend` to consume the drag and suppress the internal reorder.
+
+## Locked order (`reorder=false`)
+
+When `reorder` is `false`, this list refuses to reorder itself. Items are still draggable — selection, drag-start, the overlay stack, and the `primavera-dnd-drag*` CustomEvents all fire as normal so foreign drop zones can still consume the drag — but within this list there is no nudge, no placeholder, and a same-list drop is a no-op (items snap back). Keyboard reorder (`⌘/ctrl+↑/↓`) is also disabled. Use this when a list is a drag *source* whose internal order is fixed (e.g. a palette).
 
 ## Expansion
 When `expandable` is set, double-clicking an item toggles a single-item expanded state. Only one item is expanded at a time. The renderer is invoked once per item with an `expanded` prop — the same component instance just re-renders when its expansion flag flips, so the consumer can branch on `expanded()` to render an extra body. Expand/collapse is mutually exclusive with selection from a UX standpoint; the two states should not be conflated.

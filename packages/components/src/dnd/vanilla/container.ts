@@ -120,6 +120,10 @@ export class PrimaveraDnd extends HTMLElement {
     return this.getAttribute("nudge") !== "false";
   }
 
+  private get reorder(): boolean {
+    return this.getAttribute("reorder") !== "false";
+  }
+
   private get multi(): boolean {
     return this.getAttribute("multi") !== "false";
   }
@@ -348,7 +352,7 @@ export class PrimaveraDnd extends HTMLElement {
     if (this.isDragging) {
       // Use pre-computed collapsed order for virtualization during drag
       const visualCount = this.collapsedOrder.length;
-      const nudgeExtra = this.hoverIndex !== null && this.nudge ? 1 : 0;
+      const nudgeExtra = this.reorder && this.hoverIndex !== null && this.nudge ? 1 : 0;
       const contentHeight = this.virtualization.getTotalHeight(visualCount + nudgeExtra);
       this.listbox.style.height = `${this.fillHeight ? Math.max(contentHeight, this.itemHeight) : contentHeight}px`;
 
@@ -545,6 +549,7 @@ export class PrimaveraDnd extends HTMLElement {
   }
 
   private applyNudge(): void {
+    if (!this.reorder) return;
     const nudgeAmount = this.itemHeight;
     for (const [key, item] of this.renderedItems) {
       if (this.dragSet.has(key)) continue;
@@ -741,7 +746,7 @@ export class PrimaveraDnd extends HTMLElement {
         break;
 
       case "move-selection":
-        this.handleMoveSelection(action.direction);
+        if (this.reorder) this.handleMoveSelection(action.direction);
         break;
 
       case "select-all":
@@ -1149,7 +1154,7 @@ export class PrimaveraDnd extends HTMLElement {
     this.autoscroll.stop();
     this.placeholder.clear();
 
-    if (!consumed && this.hoverIndex !== null && this.source) {
+    if (!consumed && this.reorder && this.hoverIndex !== null && this.source) {
       // Compute the beforeKey from hoverIndex
       const beforeKey =
         this.hoverIndex < this.collapsedOrder.length
@@ -1364,7 +1369,7 @@ export class PrimaveraDnd extends HTMLElement {
   }
 
   private updatePlaceholder(): void {
-    if (this.hoverIndex === null) {
+    if (!this.reorder || this.hoverIndex === null) {
       this.placeholder.clear();
       return;
     }
