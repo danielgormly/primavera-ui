@@ -1094,10 +1094,15 @@ export class PrimaveraDnd extends HTMLElement {
       this.listbox.clientWidth,
       grabElement ?? elements[0],
     );
-    // Remove dragged items from DOM — they're now in the overlay
+    // Remove dragged items from DOM — the overlay holds clones, so the
+    // originals are now orphans. cleanup() tears down their per-item
+    // framework root; without it, those roots stay subscribed to outer
+    // signals and fire alongside the freshly-mounted post-drop roots,
+    // corrupting focus/selection and racing the save path on collapse.
     for (const key of this.draggedKeys) {
       const item = this.renderedItems.get(key);
       if (item) {
+        item.cleanup();
         item.element.remove();
         this.renderedItems.delete(key);
       }

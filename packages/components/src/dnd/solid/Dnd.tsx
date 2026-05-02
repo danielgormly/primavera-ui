@@ -4,10 +4,12 @@ import {
   onMount,
   onCleanup,
   createEffect,
+  createRoot,
+  getOwner,
   on,
   type JSX,
 } from "solid-js";
-import { render } from "solid-js/web";
+import { insert } from "solid-js/web";
 import { DndSource } from "../core/source";
 import { DndSelection } from "../core/selection";
 import { register } from "../index";
@@ -90,6 +92,11 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
   let el!: PrimaveraDnd;
   let source: DndSource<T> | null = null;
 
+  // Captured at component setup so per-item roots can chain to the host's
+  // owner — keeps `useContext`, error boundaries, and cleanup propagation
+  // working across the custom-element boundary.
+  const owner = getOwner();
+
   const keyIndex = createMemo(() => {
     const m = new Map<Key, T>();
     for (const item of props.items) m.set(props.getKey(item), item);
@@ -100,12 +107,14 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
 
   const renderer: DndRenderer<T> = {
     mount(key, initialItem, container) {
-      const dispose = render(() => {
-        const item = createMemo(() => keyIndex().get(key) ?? initialItem);
-        const expanded = createMemo(() => expandedKey() === key);
-        return props.children(item, expanded);
-      }, container);
-      return dispose;
+      return createRoot((dispose) => {
+        insert(container, () => {
+          const item = createMemo(() => keyIndex().get(key) ?? initialItem);
+          const expanded = createMemo(() => expandedKey() === key);
+          return props.children(item, expanded);
+        });
+        return dispose;
+      }, owner ?? undefined);
     },
     setExpanded(key) {
       setExpandedKey(() => key);
