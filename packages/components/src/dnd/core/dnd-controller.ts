@@ -119,6 +119,12 @@ export class DndController {
   private dragSet: Set<Key> = new Set();
   private collapsedOrder: Key[] = [];
   private visualIndexMap = new Map<Key, number>();
+  /** Set when a drag ends so the synthetic `click` that follows mouseup
+   *  is ignored. Without this, the post-drag click runs `selection.clear()`
+   *  (when clearOnClickOutside is on and the click lands on the listbox)
+   *  or `selectOnly(key)` (when it lands on a row), in either case
+   *  destroying the multi-selection that was just dragged. */
+  private suppressNextClick = false;
 
   // Expansion state
   private expandedKey: Key | null = null;
@@ -662,6 +668,11 @@ export class DndController {
   onClick = (e: MouseEvent): void => {
     if (!this.source) return;
 
+    if (this.suppressNextClick) {
+      this.suppressNextClick = false;
+      return;
+    }
+
     const key = this.getKeyFromEvent(e);
 
     this.prevClickKey = this.lastClickKey;
@@ -881,6 +892,7 @@ export class DndController {
       this.source._commitState(txnId);
     }
 
+    if (this.isDraggingFlag) this.suppressNextClick = true;
     this.isDraggingFlag = false;
     this.hoverIndex = null;
     this.lastPointerPos = null;
