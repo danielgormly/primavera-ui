@@ -293,6 +293,11 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     props.multi !== false ? "true" : "false",
   );
 
+  const anyExpanded = createMemo(() => {
+    version();
+    return controller?.getExpanded() != null;
+  });
+
   const hostStyle = createMemo<JSX.CSSProperties>(() => {
     const fill = props.fillHeight ?? false;
     return {
@@ -376,6 +381,7 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
     <div
       ref={hostEl}
       class={props.class}
+      data-expanded={anyExpanded() ? "" : undefined}
       style={
         typeof props.style === "string"
           ? props.style
