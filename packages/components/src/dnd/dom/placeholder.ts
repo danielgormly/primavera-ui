@@ -7,6 +7,7 @@ export class DndPlaceholder {
 
   constructor(itemHeight: number, borderRadius: number) {
     this.el = document.createElement("div");
+    this.el.className = "dnd-drop-placeholder";
     this.el.style.cssText =
       `position:absolute;left:0;right:0;top:0;` +
       `height:${itemHeight}px;` +
