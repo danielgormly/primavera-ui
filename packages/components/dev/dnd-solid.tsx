@@ -11,12 +11,15 @@ const initial: Item[] = Array.from({ length: 50 }, (_, i) => ({
 
 function App() {
   const [items, setItems] = createSignal<Item[]>(initial);
+  const [expandedKey, setExpandedKey] = createSignal<string | null>(null);
 
   return (
     <Dnd
       class="dnd-host"
       items={items()}
       setItems={setItems}
+      expandedKey={expandedKey()}
+      onExpandedChange={setExpandedKey}
       getKey={(i) => i.id}
       itemHeight={40}
       expandable

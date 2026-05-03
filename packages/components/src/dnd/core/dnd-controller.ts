@@ -295,10 +295,9 @@ export class DndController {
     if (!this.isDraggingFlag && this.expandedKey !== null) {
       const idx = order.indexOf(this.expandedKey);
       if (idx === -1) {
-        // Expanded item was removed from source — drop it. Defer the
-        // tearDownExpansion to the next tick so we don't recurse.
-        this.expandedKey = null;
-        this.measuredExpandedHeight = 0;
+        // Expanded item was removed from source — collapse through the
+        // normal host-notification path so wrapper state stays in sync.
+        this.clearExpandedState(true);
       } else {
         expandedIndex = idx;
       }
@@ -1104,9 +1103,9 @@ export class DndController {
 
   private applyExpanded(next: Key | null): void {
     if (next === this.expandedKey) return;
-    this.tearDownExpansion();
+    this.clearExpandedState(false);
     this.expandedKey = next;
-    this.renderer?.setExpanded?.(next);
+    this.notifyExpanded(next);
     if (next !== null) {
       // Selection collapses to just the expanded item; chrome is suppressed
       // while expandedKey is set, then reappears on collapse.
@@ -1115,10 +1114,15 @@ export class DndController {
     this.opts.onChange();
   }
 
-  private tearDownExpansion(): void {
+  private notifyExpanded(next: Key | null): void {
+    this.renderer?.setExpanded?.(next);
+  }
+
+  private clearExpandedState(notifyHost: boolean): void {
     this.detachExpansionObserver();
     this.expandedKey = null;
     this.measuredExpandedHeight = 0;
+    if (notifyHost) this.notifyExpanded(null);
   }
 
   private collapseForDrag(): void {
@@ -1134,9 +1138,7 @@ export class DndController {
       void oldEl.offsetHeight;
       oldEl.style.transition = prev;
     }
-    this.expandedKey = null;
-    this.measuredExpandedHeight = 0;
-    this.renderer?.setExpanded?.(null);
+    this.clearExpandedState(true);
     this.virtualization.setExpanded(null, this.cfg.itemHeight);
   }
 

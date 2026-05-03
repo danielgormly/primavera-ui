@@ -30,6 +30,10 @@ export interface DndProps<T> {
   items: T[];
   setItems?: (next: T[]) => void;
   onReorder?: (op: DndOp<T>) => void;
+  /** Controlled expanded item key. Leave undefined for uncontrolled mode. */
+  expandedKey?: Key | null;
+  /** Fired whenever the controller requests an expansion state change. */
+  onExpandedChange?: (key: Key | null) => void;
   /** Receives an imperative handle for setExpanded / getExpanded / getSelection. */
   ref?: (handle: DndImperative) => void;
   getKey: (item: T) => Key;
@@ -80,7 +84,8 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
   // Singleton expansion state lifted into Solid so per-row `expanded()` and
   // host-level `data-expanded` derive directly from a primitive signal —
   // not from the broad version() bump via per-item render-state lookup.
-  const [expandedKey, setExpandedKey] = createSignal<Key | null>(null);
+  const [uncontrolledExpandedKey, setUncontrolledExpandedKey] =
+    createSignal<Key | null>(null);
 
   const keyIndex = createMemo(() => {
     const m = new Map<Key, T>();
@@ -90,6 +95,12 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
 
   let controller: DndController | null = null;
   let source: DndSource<T> | null = null;
+  let syncingControlledExpanded = false;
+
+  const isExpansionControlled = () => props.expandedKey !== undefined;
+  const expandedKey = createMemo<Key | null>(() =>
+    isExpansionControlled() ? (props.expandedKey ?? null) : uncontrolledExpandedKey(),
+  );
 
   const cfg = (): DndControllerConfig => ({
     itemHeight: props.itemHeight ?? 32,
@@ -159,7 +170,14 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
       // Push singleton expansion state into Solid as a primitive signal so
       // only the matching row reacts on flip — instead of every row reading
       // through the per-item state map on every version() bump.
-      setExpanded: (k) => setExpandedKey(k),
+      setExpanded: (k) => {
+        if (!isExpansionControlled()) {
+          setUncontrolledExpandedKey(k);
+        }
+        if (!syncingControlledExpanded) {
+          props.onExpandedChange?.(k);
+        }
+      },
       getNativeDropData: props.getNativeDropData,
     });
 
@@ -205,6 +223,16 @@ export function Dnd<T>(props: DndProps<T>): JSX.Element {
   createEffect(() => {
     if (!controller) return;
     controller.setConfig(cfg());
+  });
+
+  createEffect(() => {
+    if (!controller || !isExpansionControlled()) return;
+    const next = props.expandedKey ?? null;
+    if (controller.getExpanded() !== next) {
+      syncingControlledExpanded = true;
+      controller.setExpanded(next);
+      syncingControlledExpanded = false;
+    }
   });
 
   onCleanup(() => {
